@@ -2,7 +2,7 @@ package com.example.backend_Whiteboard.controller;
 
 import com.example.backend_Whiteboard.config.DatabaseSeeder;
 import com.example.backend_Whiteboard.model.Board;
-import com.example.backend_Whiteboard.model.StrokeEntity;
+import com.example.backend_Whiteboard.model.Stroke;
 import com.example.backend_Whiteboard.model.User;
 import com.example.backend_Whiteboard.repository.BoardRepository;
 import com.example.backend_Whiteboard.repository.StrokeRepository;
@@ -31,7 +31,7 @@ public class StrokeController {
     private UserRepository userRepository;
 
     @GetMapping
-    public ResponseEntity<List<StrokeEntity>> getAllDrawings() {
+    public ResponseEntity<List<Stroke>> getAllDrawings() {
         // Mock: just return all strokes for the default board
         if (seeder.getDefaultBoardId() == null) {
             return ResponseEntity.ok(List.of());
@@ -40,7 +40,7 @@ public class StrokeController {
     }
 
     @PostMapping
-    public ResponseEntity<?> saveDrawing(@RequestBody StrokeEntity stroke) {
+    public ResponseEntity<?> saveDrawing(@RequestBody Stroke stroke) {
         try {
             // Mock: assign default board and user if missing
             if (stroke.getBoard() == null && seeder.getDefaultBoardId() != null) {
@@ -52,7 +52,7 @@ public class StrokeController {
                 stroke.setUser(defaultUser);
             }
 
-            StrokeEntity saved = strokeRepository.save(stroke);
+            Stroke saved = strokeRepository.save(stroke);
             return ResponseEntity.ok(saved);
         } catch (Exception e) {
             e.printStackTrace();

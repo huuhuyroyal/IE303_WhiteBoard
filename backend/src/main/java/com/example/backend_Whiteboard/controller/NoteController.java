@@ -2,7 +2,7 @@ package com.example.backend_Whiteboard.controller;
 
 import com.example.backend_Whiteboard.config.DatabaseSeeder;
 import com.example.backend_Whiteboard.model.Board;
-import com.example.backend_Whiteboard.model.NoteEntity;
+import com.example.backend_Whiteboard.model.Note;
 import com.example.backend_Whiteboard.model.User;
 import com.example.backend_Whiteboard.repository.BoardRepository;
 import com.example.backend_Whiteboard.repository.NoteRepository;
@@ -31,7 +31,7 @@ public class NoteController {
     private UserRepository userRepository;
 
     @GetMapping
-    public ResponseEntity<List<NoteEntity>> getAllNotes() {
+    public ResponseEntity<List<Note>> getAllNotes() {
         if (seeder.getDefaultBoardId() == null) {
             return ResponseEntity.ok(List.of());
         }
@@ -39,7 +39,7 @@ public class NoteController {
     }
 
     @PostMapping
-    public ResponseEntity<?> saveNote(@RequestBody NoteEntity note) {
+    public ResponseEntity<?> saveNote(@RequestBody Note note) {
         try {
             if (note.getBoard() == null && seeder.getDefaultBoardId() != null) {
                 Board defaultBoard = boardRepository.findById(seeder.getDefaultBoardId()).orElse(null);
@@ -49,7 +49,7 @@ public class NoteController {
                 User defaultUser = userRepository.findById(seeder.getDefaultUserId()).orElse(null);
                 note.setUser(defaultUser);
             }
-            NoteEntity saved = noteRepository.save(note);
+            Note saved = noteRepository.save(note);
             return ResponseEntity.ok(saved);
         } catch (Exception e) {
             e.printStackTrace();
@@ -58,7 +58,7 @@ public class NoteController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateNote(@PathVariable UUID id, @RequestBody NoteEntity updated) {
+    public ResponseEntity<?> updateNote(@PathVariable UUID id, @RequestBody Note updated) {
         try {
             return noteRepository.findById(id).map(existing -> {
                 existing.setX(updated.getX());
