@@ -1,0 +1,28 @@
+node_modules/
+frontend/node_modules/
+.env
+.env.*
+dist/
+frontend/dist/
+frontend/build/
+.DS_Store
+source_dump.txt
+.agent
+.agents
+.skills-lock.json
+skills-lock.json
+roadmap.md
+
+# IDE evironment and backend
+.vscode/
+.idea/
+*.iml
+*.class
+backend/target/
+backend/bin/
+backend/build/
+.m2/
+
+
+# Ignore local database configuration
+src/main/resources/application.properties
