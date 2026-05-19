@@ -9,7 +9,7 @@ import java.util.UUID;
 public class Board {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @Column(nullable = false, length = 100)
@@ -25,7 +25,14 @@ public class Board {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    public Board() {}
+    @Column(name = "last_opened_at")
+    private LocalDateTime lastOpenedAt;
+
+    @Column(columnDefinition = "TEXT")
+    private String thumbnail;
+
+    public Board() {
+    }
 
     public Board(String title, User owner) {
         this.title = title;
@@ -33,14 +40,59 @@ public class Board {
     }
 
     // Getters and Setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-    public String getTitle() { return title; }
-    public void setTitle(String title) { this.title = title; }
-    public User getOwner() { return owner; }
-    public void setOwner(User owner) { this.owner = owner; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-    public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public UUID getId() {
+        return id;
+    }
+
+    public void setId(UUID id) {
+        this.id = id;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public User getOwner() {
+        return owner;
+    }
+
+    public void setOwner(User owner) {
+        this.owner = owner;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    public LocalDateTime getLastOpenedAt() {
+        return lastOpenedAt;
+    }
+
+    public void setLastOpenedAt(LocalDateTime lastOpenedAt) {
+        this.lastOpenedAt = lastOpenedAt;
+    }
+
+    public String getThumbnail() {
+        return thumbnail;
+    }
+
+    public void setThumbnail(String thumbnail) {
+        this.thumbnail = thumbnail;
+    }
 }

@@ -8,7 +8,7 @@ const PRESET_COLORS = [
 
 export default function ColorPicker({ color, setColor, strokeWidth, setStrokeWidth }) {
   return (
-    <div className="absolute left-20 top-1/2 -translate-y-1/2 bg-white p-3 rounded-xl shadow-xl z-10 border border-slate-200 flex flex-col gap-3">
+    <div className="flex flex-col gap-3">
       {/* Preset Colors */}
       <div className="grid grid-cols-5 gap-1.5">
         {PRESET_COLORS.map(c => (

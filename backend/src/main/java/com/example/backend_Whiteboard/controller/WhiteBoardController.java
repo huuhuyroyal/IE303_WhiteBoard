@@ -15,6 +15,12 @@ public class WhiteBoardController {
         return stroke;
     }
 
+    @MessageMapping("/create")
+    @SendTo("/topic/create")
+    public java.util.Map<String, String> broadcastCreate(java.util.Map<String, String> payload) {
+        return payload;
+    }
+
     @MessageMapping("/delete")
     @SendTo("/topic/delete")
     public java.util.Map<String, String> broadcastDelete(java.util.Map<String, String> payload) {

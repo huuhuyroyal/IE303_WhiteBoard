@@ -2,14 +2,9 @@ import { useState } from 'react';
 import {
   Pencil, Square, Circle, Triangle, MousePointer2,
   Eraser, Minus, StickyNote, Diamond,
-  Highlighter, Palette, Hand
+  Highlighter, Hand
 } from 'lucide-react';
-
-const PRESET_COLORS = [
-  '#1E1E1E', '#E03131', '#E8590C', '#FCC419',
-  '#40C057', '#15AABF', '#228BE6', '#7950F2',
-  '#BE4BDB', '#FFFFFF'
-];
+import ColorPicker from './ColorPicker';
 
 function ToolButton({ icon, active, onClick, title }) {
   return (
@@ -27,10 +22,9 @@ function ToolButton({ icon, active, onClick, title }) {
   );
 }
 
-// Submenu popup with tool items + inline color/size picker
-function SubmenuPanel({ items, activeTool, onSelect, onClose, color, setColor, strokeWidth, setStrokeWidth }) {
+function SubmenuPanel({ items, activeTool, onSelect, color, setColor, strokeWidth, setStrokeWidth }) {
   return (
-    <div className="fixed left-16 top-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl border border-slate-200 p-3 z-50 min-w-[220px]">      {/* Tool options */}
+    <div className="fixed left-16 top-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl border border-slate-200 p-3 z-50 min-w-[220px]">
       <div className="flex flex-col gap-1 mb-2">
         {items.map(item => (
           <button
@@ -51,47 +45,12 @@ function SubmenuPanel({ items, activeTool, onSelect, onClose, color, setColor, s
 
       <div className="w-full h-px bg-slate-200 my-2"></div>
 
-      {/* Inline Color Picker */}
-      <div className="grid grid-cols-5 gap-1.5 mb-2">
-        {PRESET_COLORS.map(c => (
-          <button
-            key={c}
-            onClick={() => setColor(c)}
-            title={c}
-            className={`w-6 h-6 rounded-full border-2 transition-all hover:scale-110 ${
-              color === c ? 'border-blue-500 scale-110 shadow-md' : 'border-slate-300'
-            }`}
-            style={{ backgroundColor: c }}
-          />
-        ))}
-      </div>
-
-      {/* Custom color + hex */}
-      <div className="flex items-center gap-2 mb-2">
-        <input
-          type="color"
-          value={color}
-          onChange={e => setColor(e.target.value)}
-          className="w-6 h-6 rounded cursor-pointer border-0 p-0"
-          title="Custom Color"
-        />
-        <span className="text-[10px] font-mono text-slate-400 uppercase">{color}</span>
-      </div>
-
-      <div className="w-full h-px bg-slate-200 my-2"></div>
-
-      {/* Stroke Width */}
-      <div className="flex items-center gap-2">
-        <span className="text-[10px] text-slate-400">Size</span>
-        <input
-          type="range"
-          min="1" max="20"
-          value={strokeWidth}
-          onChange={e => setStrokeWidth(Number(e.target.value))}
-          className="flex-1 h-1 accent-blue-500"
-        />
-        <span className="text-[10px] font-mono text-slate-500 w-4 text-right">{strokeWidth}</span>
-      </div>
+      <ColorPicker
+        color={color}
+        setColor={setColor}
+        strokeWidth={strokeWidth}
+        setStrokeWidth={setStrokeWidth}
+      />
     </div>
   );
 }
@@ -120,7 +79,7 @@ export default function Toolbar({ tool, setTool, color, setColor, strokeWidth, s
   const currentShapeIcon = SHAPE_ITEMS.find(i => i.tool === tool)?.icon || <Square size={20} />;
 
   const isPenTool = PEN_ITEMS.some(i => i.tool === tool);
-  const isShapeTool = SHAPE_ITEMS.some(i => i.tool === tool);
+  const isShapeToolActive = SHAPE_ITEMS.some(i => i.tool === tool);
 
   return (
     <>
@@ -143,7 +102,6 @@ export default function Toolbar({ tool, setTool, color, setColor, strokeWidth, s
         />
         <div className="w-full h-px bg-slate-200 my-1"></div>
 
-        {/* Pen Group */}
         <div className="relative">
           <ToolButton
             icon={currentPenIcon}
@@ -156,9 +114,10 @@ export default function Toolbar({ tool, setTool, color, setColor, strokeWidth, s
               items={PEN_ITEMS}
               activeTool={tool}
               onSelect={setTool}
-              onClose={() => setOpenSubmenu(null)}
-              color={color} setColor={setColor}
-              strokeWidth={strokeWidth} setStrokeWidth={setStrokeWidth}
+              color={color}
+              setColor={setColor}
+              strokeWidth={strokeWidth}
+              setStrokeWidth={setStrokeWidth}
             />
           )}
         </div>
@@ -171,12 +130,11 @@ export default function Toolbar({ tool, setTool, color, setColor, strokeWidth, s
         />
         <div className="w-full h-px bg-slate-200 my-1"></div>
 
-        {/* Shape Group */}
         <div className="relative">
           <ToolButton
             icon={currentShapeIcon}
-            active={isShapeTool}
-            onClick={() => { if (!isShapeTool) setTool('rectangle'); toggleSubmenu('shape'); }}
+            active={isShapeToolActive}
+            onClick={() => { if (!isShapeToolActive) setTool('rectangle'); toggleSubmenu('shape'); }}
             title="Shape tools"
           />
           {openSubmenu === 'shape' && (
@@ -184,9 +142,10 @@ export default function Toolbar({ tool, setTool, color, setColor, strokeWidth, s
               items={SHAPE_ITEMS}
               activeTool={tool}
               onSelect={setTool}
-              onClose={() => setOpenSubmenu(null)}
-              color={color} setColor={setColor}
-              strokeWidth={strokeWidth} setStrokeWidth={setStrokeWidth}
+              color={color}
+              setColor={setColor}
+              strokeWidth={strokeWidth}
+              setStrokeWidth={setStrokeWidth}
             />
           )}
         </div>
