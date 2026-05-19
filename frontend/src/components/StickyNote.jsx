@@ -26,19 +26,19 @@ export default function StickyNote({ note, onUpdate, onDelete, cameraZoom = 1 })
     setIsDragging(true);
     dragOffset.current = {
       x: e.clientX / cameraZoom - note.x,
-      y: e.clientY / cameraZoom - note.y
+      y: e.clientY / cameraZoom - note.y,
     };
     e.preventDefault();
   };
 
   useEffect(() => {
-    if (!isDragging) return;
+    if (!isDragging) return undefined;
 
     const handleMove = (e) => {
       onUpdate({
         ...note,
         x: e.clientX / cameraZoom - dragOffset.current.x,
-        y: e.clientY / cameraZoom - dragOffset.current.y
+        y: e.clientY / cameraZoom - dragOffset.current.y,
       });
     };
 
@@ -50,12 +50,12 @@ export default function StickyNote({ note, onUpdate, onDelete, cameraZoom = 1 })
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerup', handleUp);
     };
-  }, [isDragging]);
+  }, [cameraZoom, isDragging, note, onUpdate]);
 
   const cycleColor = () => {
     onUpdate({
       ...note,
-      colorIndex: ((note.colorIndex || 0) + 1) % NOTE_COLORS.length
+      colorIndex: ((note.colorIndex || 0) + 1) % NOTE_COLORS.length,
     });
   };
 
@@ -69,7 +69,6 @@ export default function StickyNote({ note, onUpdate, onDelete, cameraZoom = 1 })
         minHeight: 120,
       }}
     >
-      {/* Header */}
       <div
         className={`${colorTheme.header} rounded-t-md px-2 py-1.5 flex items-center justify-between cursor-grab active:cursor-grabbing`}
         onPointerDown={handleDragStart}
@@ -80,7 +79,7 @@ export default function StickyNote({ note, onUpdate, onDelete, cameraZoom = 1 })
             onClick={cycleColor}
             title="Change color"
             className="w-4 h-4 rounded-full border border-slate-400 hover:scale-125 transition-transform"
-            style={{ backgroundColor: ['#fef08a','#93c5fd','#86efac','#f9a8d4','#c4b5fd'][note.colorIndex || 0] }}
+            style={{ backgroundColor: ['#fef08a', '#93c5fd', '#86efac', '#f9a8d4', '#c4b5fd'][note.colorIndex || 0] }}
           />
         </div>
         <button
@@ -92,7 +91,6 @@ export default function StickyNote({ note, onUpdate, onDelete, cameraZoom = 1 })
         </button>
       </div>
 
-      {/* Content */}
       <div className="p-2" onDoubleClick={() => setIsEditing(true)}>
         {isEditing ? (
           <textarea

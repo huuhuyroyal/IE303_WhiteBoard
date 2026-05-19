@@ -23,7 +23,6 @@ public class Stroke {
     @JoinColumn(name = "board_id", nullable = false)
     private Board board;
 
-    // Đọc thẳng cột board_id từ DB → trả về cho Frontend mà không cần mở Object
     // Board
     @Column(name = "board_id", insertable = false, updatable = false)
     private UUID boardId;
