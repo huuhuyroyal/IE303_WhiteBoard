@@ -57,7 +57,7 @@ cd backend
 ./mvnw clean install
 ```
 
-Fill in `backend/src/main/resources/application.properties` (ask team members for all required keys and password).
+Fill in `backend/src/main/resources/application.properties`.
 
 **Run development server:**
 
