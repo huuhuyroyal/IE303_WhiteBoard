@@ -15,7 +15,7 @@ export function isPointInShapeElement(x, y, element) {
 
   if (x < xMin || x > xMax || y < yMin || y > yMax) return false;
 
-  if (element.type === 'rectangle' || element.type === 'line') return true;
+  if (element.type === 'rectangle' || element.type === 'line' || element.type === 'ai-svg') return true;
 
   if (element.type === 'circle') {
     const cx = (p1.x + p2.x) / 2;

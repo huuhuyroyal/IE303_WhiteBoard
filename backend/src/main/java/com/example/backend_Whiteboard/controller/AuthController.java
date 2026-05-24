@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -87,5 +88,29 @@ public class AuthController {
                         "userId", u.getId().toString(),
                         "username", u.getUsername())))
                 .orElse(ResponseEntity.status(404).body(Map.of("error", "User not found")));
+    }
+
+    // GET /api/auth/users/search?q=...
+    @GetMapping("/users/search")
+    public ResponseEntity<?> searchUsers(
+            @RequestParam("q") String keyword,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(401).body(Map.of("error", "No token provided"));
+        }
+        if (!jwtUtil.isValid(authHeader.substring(7))) {
+            return ResponseEntity.status(401).body(Map.of("error", "Invalid or expired token"));
+        }
+        
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return ResponseEntity.ok(List.of());
+        }
+
+        List<User> users = userRepository.findByUsernameContainingIgnoreCase(keyword.trim());
+        List<Map<String, String>> results = users.stream()
+                .map(u -> Map.of("username", u.getUsername(), "userId", u.getId().toString()))
+                .toList();
+
+        return ResponseEntity.ok(results);
     }
 }

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 87.4 114.09">
+    <defs>
+        <style>
+            .cls-1,.cls-2,.cls-3{fill:none}.cls-1,.cls-2{stroke:#231f20;stroke-width:5px}.cls-1,.cls-3{stroke-miterlimit:10}.cls-2{stroke-linejoin:round}.cls-3{stroke:#000}
+        </style>
+    </defs>
+    <title>
+        TheBigCity
+    </title>
+    <g id="Fills">
+        <path class="cls-1" d="M26.74 15.65h32.63v84.67H26.74z"/>
+        <circle class="cls-1" cx="43.05" cy="33.48" r="8.04"/>
+        <circle class="cls-1" cx="43.05" cy="58.15" r="8.04"/>
+        <circle class="cls-1" cx="43.05" cy="82.82" r="8.04"/>
+        <path class="cls-2" d="M12.41 25.44h14.33v12.65L12.41 25.44z"/>
+        <path class="cls-2" d="M12.41 51.82h14.33v12.65L12.41 51.82z"/>
+        <path class="cls-2" d="M12.41 76.49h14.33v12.65L12.41 76.49z"/>
+        <path class="cls-2" d="M73.99 26.14H59.66v12.65l14.33-12.65z"/>
+        <path class="cls-2" d="M73.99 52.52H59.66v12.65l14.33-12.65z"/>
+        <path class="cls-2" d="M73.99 77.18H59.66v12.66l14.33-12.66z"/>
+    </g>
+    <g id="Outlines">
+        <path class="cls-3" d="M26.74 25.44v74.88h32.62V15.65H26.74zm16.31 0a8 8 0 1 1-8 8 8 8 0 0 1 7.95-8zm0 24.67a8 8 0 1 1-8 8 8 8 0 0 1 7.95-8zm0 24.67a8 8 0 1 1-8 8 8 8 0 0 1 7.95-8z"/>
+        <circle class="cls-3" cx="43.05" cy="33.48" r="8.04"/>
+        <circle class="cls-3" cx="43.05" cy="58.15" r="8.04"/>
+        <circle class="cls-3" cx="43.05" cy="82.82" r="8.04"/>
+        <path class="cls-3" d="M12.41 25.44l14.33 12.65V25.44H12.41z"/>
+        <path class="cls-3" d="M12.41 51.82l14.33 12.65V51.82H12.41z"/>
+        <path class="cls-3" d="M12.41 76.49l14.33 12.65V76.49H12.41z"/>
+        <path class="cls-3" d="M59.66 26.14v12.65l14.33-12.65H59.66z"/>
+        <path class="cls-3" d="M59.66 65.17l14.33-12.65H59.66v12.65z"/>
+        <path class="cls-3" d="M59.66 89.84l14.33-12.66H59.66v12.66z"/>
+    </g>
+</svg>

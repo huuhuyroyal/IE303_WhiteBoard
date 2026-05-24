@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 163 639">
+    <defs>
+        <style>
+            .cls-1{fill:#fff}.cls-2{fill:none;stroke:#231f20;stroke-miterlimit:10;stroke-width:5px}
+        </style>
+    </defs>
+    <title>
+        TheBigCity
+    </title>
+    <g id="Fills">
+        <path class="cls-1" d="M22.21 56.99h122.12v564.06H22.21z"/>
+        <path class="cls-1" d="M47.21 87.75h18v76.55h-18z"/>
+        <path class="cls-1" d="M98.21 87.75h18v76.55h-18z"/>
+        <path class="cls-1" d="M47.21 199.79h18v76.55h-18z"/>
+        <path class="cls-1" d="M98.21 199.79h18v76.55h-18z"/>
+        <path class="cls-1" d="M47.21 311.84h18v76.55h-18z"/>
+        <path class="cls-1" d="M98.21 311.84h18v76.55h-18z"/>
+        <path class="cls-1" d="M47.21 412.79h18v76.55h-18z"/>
+        <path class="cls-1" d="M98.21 412.79h18v76.55h-18z"/>
+        <path class="cls-1" d="M47.21 513.73h18v76.55h-18z"/>
+        <path class="cls-1" d="M98.21 513.73h18v76.55h-18z"/>
+    </g>
+    <g id="Outlines">
+        <path class="cls-2" d="M22.21 56.99h122.12v564.06H22.21z"/>
+        <path class="cls-2" d="M47.21 87.75h18v76.55h-18z"/>
+        <path class="cls-2" d="M98.21 87.75h18v76.55h-18z"/>
+        <path class="cls-2" d="M47.21 199.79h18v76.55h-18z"/>
+        <path class="cls-2" d="M98.21 199.79h18v76.55h-18z"/>
+        <path class="cls-2" d="M47.21 311.84h18v76.55h-18z"/>
+        <path class="cls-2" d="M98.21 311.84h18v76.55h-18z"/>
+        <path class="cls-2" d="M47.21 412.79h18v76.55h-18z"/>
+        <path class="cls-2" d="M98.21 412.79h18v76.55h-18z"/>
+        <path class="cls-2" d="M47.21 513.73h18v76.55h-18z"/>
+        <path class="cls-2" d="M98.21 513.73h18v76.55h-18z"/>
+    </g>
+</svg>

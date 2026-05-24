@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 173.1 114.09">
+    <defs>
+        <style>
+            .cls-1{fill:#fff}.cls-2,.cls-3{fill:none;stroke:#231f20;stroke-width:5px}.cls-2{stroke-miterlimit:10}.cls-3{stroke-linejoin:round}
+        </style>
+    </defs>
+    <title>
+        TheBigCity
+    </title>
+    <ellipse class="cls-1" cx="98.14" cy="32.69" rx="8.12" ry="5.58" id="Fills"/>
+    <g id="Outlines">
+        <circle class="cls-2" cx="47.03" cy="72.25" r="18.39"/>
+        <circle class="cls-2" cx="117.53" cy="72.25" r="18.39"/>
+        <path class="cls-3" d="M80.26 72.25h37.27L92.9 43.62H57.58l22.68 28.63z"/>
+        <path class="cls-2" d="M65.43 21.28l-18.4 50.97"/>
+        <path class="cls-3" d="M95.38 37.42L80.26 72.25"/>
+        <ellipse class="cls-3" cx="98.14" cy="32.69" rx="8.12" ry="5.58"/>
+        <path class="cls-3" d="M50.76 21.59h28.18"/>
+    </g>
+</svg>

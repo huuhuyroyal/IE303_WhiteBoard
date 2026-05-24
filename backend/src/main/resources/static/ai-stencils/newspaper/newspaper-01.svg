@@ -1,0 +1,35 @@
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 252.2 177.4">
+    <style>
+        .st0{fill:#fff}.st1{fill:none;stroke:#231f20;stroke-width:5;stroke-linejoin:round}
+    </style>
+    <title>
+        TheBigCity
+    </title>
+    <path class="st0" d="M32.1 134.6l93.9 19.6V42.9L32.1 23.3v111.3zm9-74.8l75.2 16.3v29.3L41.1 89.1V59.8z"/>
+    <path class="st0" d="M126.1 42.9v111.3l93.9-19.6V23.3l-93.9 19.6zm40.5 31.6l-31.2 7V53.8l31.2-7v27.7zm43.4 27.3l-31.2 7V81l31.2-7v27.8z"/>
+    <path class="st0" d="M116.3 76.1L41.1 59.8v29.3l75.2 16.3z"/>
+    <path class="st0" d="M135.4 81.6l31.2-7.1V46.7l-31.2 7.1z"/>
+    <path class="st0" d="M178.7 108.8l31.3-7V74l-31.3 7z"/>
+    <g id="Outlines">
+        <path class="st1" d="M41.1 89.1l75.2 16.3V76.1L41.1 59.8z"/>
+        <path class="st1" d="M41.1 49.6l75.2 16.3V53.7L41.1 37.3z"/>
+        <path class="st1" d="M41.1 102.3l33 7.3"/>
+        <path class="st1" d="M41.1 112.3l33 7.4"/>
+        <path class="st1" d="M41.1 122.4l33 7.3"/>
+        <path class="st1" d="M85.9 111.7l30.4 6.9"/>
+        <path class="st1" d="M85.9 121.8l30.4 6.8"/>
+        <path class="st1" d="M85.9 131.8l30.4 6.9"/>
+        <path class="st1" d="M32.1 134.6l94 19.6V42.9l-94-19.6z"/>
+        <path class="st1" d="M135.4 81.6l31.2-7.1V46.7l-31.2 7.1z"/>
+        <path class="st1" d="M178.7 108.8l31.3-7V74l-31.3 7z"/>
+        <path class="st1" d="M178.7 48.9l33-7.3"/>
+        <path class="st1" d="M178.7 58.5l33-7.4"/>
+        <path class="st1" d="M178.7 68l33-7.3"/>
+        <path class="st1" d="M135.4 94.1l30.3-6.9"/>
+        <path class="st1" d="M135.4 103.6l30.3-6.9"/>
+        <path class="st1" d="M135.4 113.2l30.3-6.9"/>
+        <path class="st1" d="M135.4 129.3l75-16.3"/>
+        <path class="st1" d="M135.4 138.8l75-16.3"/>
+        <path class="st1" d="M126.1 154.2l94-19.6V23.3l-94 19.6z"/>
+    </g>
+</svg>

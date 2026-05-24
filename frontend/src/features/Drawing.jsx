@@ -18,9 +18,11 @@ export function useDrawingFeature({
   color,
   strokeWidth,
   onBoardChanged,
+  onPencilStrokeComplete,
 }) {
   const canvasRef = useRef(null);
   const elementsRef = useRef([]);
+  const imageCacheRef = useRef(new Map());
   const currentPathRef = useRef([]);
   const linePreviewRef = useRef(null);
   const shapePreviewRef = useRef(null);
@@ -45,14 +47,7 @@ export function useDrawingFeature({
       .then((res) => res.ok ? res.json() : [])
       .then((data) => {
         const next = Array.isArray(data)
-          ? data.map((item) => ({
-              id: item.id,
-              boardId,
-              type: item.metadata?.type || 'path',
-              points: item.points,
-              color: item.color,
-              width: item.width,
-            }))
+          ? data.map((item) => normalizeElement(item, boardId))
           : [];
         setElements(next);
         elementsRef.current = next;
@@ -71,14 +66,7 @@ export function useDrawingFeature({
         setElements((prev) => {
           const next = [...prev];
           const index = next.findIndex((item) => item.id === incoming.id);
-          const element = {
-            id: incoming.id,
-            boardId,
-            type: incoming.metadata?.type || 'path',
-            points: incoming.points,
-            color: incoming.color,
-            width: incoming.width,
-          };
+          const element = normalizeElement(incoming, boardId);
           if (index === -1) next.push(element);
           else next[index] = element;
           elementsRef.current = next;
@@ -138,7 +126,7 @@ export function useDrawingFeature({
         }
       }
 
-      if (isShapeTool(element.type) && isPointInShapeElement(x, y, element)) {
+      if ((isShapeTool(element.type) || element.type === 'ai-svg') && isPointInShapeElement(x, y, element)) {
         return element;
       }
     }
@@ -153,7 +141,11 @@ export function useDrawingFeature({
       color: element.color,
       width: element.width,
       points: element.points,
-      metadata: { type: element.type, tool: element.type },
+      metadata: {
+        ...(element.metadata || {}),
+        type: element.type,
+        tool: element.metadata?.tool || element.type,
+      },
     };
 
     const path = method === 'POST'
@@ -204,7 +196,7 @@ export function useDrawingFeature({
     if (tool === 'select') {
       const target = findElementAtPoint(x, y);
 
-      if (target && isShapeTool(target.type)) {
+      if (target && (isShapeTool(target.type) || target.type === 'ai-svg')) {
         const p1 = target.points[0];
         const p2 = target.points[target.points.length - 1];
         const xMax = Math.max(p1.x, p2.x);
@@ -366,6 +358,7 @@ export function useDrawingFeature({
         points: [...currentPathRef.current],
         color,
         width: tool === 'highlighter' ? 20 : strokeWidth,
+        metadata: {},
       };
       setElements((prev) => {
         const all = [...prev, next];
@@ -374,6 +367,7 @@ export function useDrawingFeature({
       });
       currentPathRef.current = [];
       saveStroke(next, 'POST');
+      if (tool === 'pencil') onPencilStrokeComplete?.(next);
       bumpPreview();
       return;
     }
@@ -389,6 +383,7 @@ export function useDrawingFeature({
         ],
         color,
         width: strokeWidth,
+        metadata: {},
       };
       setElements((prev) => {
         const all = [...prev, next];
@@ -412,6 +407,7 @@ export function useDrawingFeature({
         ],
         color,
         width: strokeWidth,
+        metadata: {},
       };
       setElements((prev) => {
         const all = [...prev, next];
@@ -463,6 +459,8 @@ export function useDrawingFeature({
           else ctx.lineTo(point.x, point.y);
         });
         ctx.stroke();
+      } else if (element.type === 'ai-svg') {
+        drawSvgElement(ctx, element, imageCacheRef.current, bumpPreview);
       } else if (isShapeTool(element.type)) {
         drawShapeElement(ctx, element.type, element.points);
       }
@@ -546,12 +544,83 @@ export function useDrawingFeature({
           ? 'crosshair'
           : CURSORS[tool] || 'crosshair');
 
+  const removeElement = (id) => {
+    setElements((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      elementsRef.current = next;
+      return next;
+    });
+    fetch(`${BASE}/api/board/${boardId}/stroke/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    }).catch(() => {});
+  };
+
+  const replaceElementWithSuggestion = (option, targetIds) => {
+    const ids = Array.isArray(targetIds) ? targetIds : [targetIds];
+    const matched = ids
+      .map((id) => elementsRef.current.find((item) => item.id === id))
+      .filter(Boolean);
+
+    if (!matched.length) return;
+
+    const anchor = matched[0];
+    const allPoints = matched.flatMap((item) => item.points || []);
+    if (!allPoints.length) return;
+
+    const xs = allPoints.map((point) => point.x);
+    const ys = allPoints.map((point) => point.y);
+    const next = {
+      ...anchor,
+      type: 'ai-svg',
+      color: '#1E1E1E',
+      width: 1,
+      points: [
+        { x: Math.min(...xs), y: Math.min(...ys) },
+        { x: Math.max(...xs), y: Math.max(...ys) },
+      ],
+      metadata: {
+        type: 'ai-svg',
+        tool: 'ai-svg',
+        label: option.label,
+        sampleId: option.sampleId,
+        svgUrl: resolveSvgUrl(option.svgUrl),
+        color: anchor.color,
+      },
+    };
+
+    setElements((prev) => {
+      const idSet = new Set(ids);
+      const updated = prev
+        .filter((item) => item.id === anchor.id || !idSet.has(item.id))
+        .map((item) => item.id === anchor.id ? next : item);
+      elementsRef.current = updated;
+      return updated;
+    });
+    ids
+      .filter((id) => id !== anchor.id)
+      .forEach((id) => {
+        fetch(`${BASE}/api/board/${boardId}/stroke/${id}`, {
+          method: 'DELETE',
+          headers: authHeaders(),
+        }).catch(() => {});
+        publish('/app/delete', { id });
+      });
+    selectedElementIdRef.current = anchor.id;
+    setSelectedElementId(anchor.id);
+    saveStroke(next, 'PUT');
+    onBoardChanged?.();
+    bumpPreview();
+  };
+
   return {
     canvasRef,
     cursor,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
+    removeElement,
+    replaceElementWithSuggestion,
   };
 }
 
@@ -568,4 +637,85 @@ export default function Drawing({ canvasRef, cursor, onPointerDown, onPointerMov
       onContextMenu={(event) => event.preventDefault()}
     />
   );
+}
+
+function normalizeElement(item, boardId) {
+  return {
+    id: item.id,
+    boardId,
+    type: item.metadata?.type || 'path',
+    points: item.points,
+    color: item.color,
+    width: item.width,
+    metadata: item.metadata || {},
+  };
+}
+
+function resolveSvgUrl(svgUrl) {
+  if (!svgUrl) return '';
+  if (svgUrl.startsWith('http://') || svgUrl.startsWith('https://') || svgUrl.startsWith('data:')) {
+    return svgUrl;
+  }
+  return `${BASE}${svgUrl.startsWith('/') ? '' : '/'}${svgUrl}`;
+}
+
+function drawSvgElement(ctx, element, imageCache, onLoad) {
+  if (!element?.points || element.points.length < 2) return;
+
+  const [p1, p2] = element.points;
+  const x = Math.min(p1.x, p2.x);
+  const y = Math.min(p1.y, p2.y);
+  const width = Math.max(1, Math.abs(p2.x - p1.x));
+  const height = Math.max(1, Math.abs(p2.y - p1.y));
+  const svgUrl = resolveSvgUrl(element.metadata?.svgUrl || '');
+
+  if (!svgUrl) return;
+
+  const color = element.metadata?.color || '#000000';
+  const cacheKey = `${svgUrl}-${color}`;
+
+  let image = imageCache.get(cacheKey);
+  if (!image) {
+    image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => onLoad();
+    image.onerror = () => onLoad();
+    
+    imageCache.set(cacheKey, image);
+
+    fetch(svgUrl)
+      .then(res => res.text())
+      .then(text => {
+        let processed = text.replace(/fill:\s*#fff(?:fff)?/gi, 'fill:none');
+        processed = processed.replace(/fill=["']#fff(?:fff)?["']/gi, 'fill="none"');
+        
+        if (element.metadata?.color) {
+          processed = processed.replace(/stroke:\s*#[0-9a-fA-F]+/gi, `stroke:${color}`);
+          processed = processed.replace(/stroke=["']#[0-9a-fA-F]+["']/gi, `stroke="${color}"`);
+        }
+        
+        const blob = new Blob([processed], { type: 'image/svg+xml' });
+        image.src = URL.createObjectURL(blob);
+      })
+      .catch(err => {
+        console.error("Failed to process SVG", err);
+        image.src = svgUrl;
+      });
+  }
+
+  if (image.complete && image.src && image.naturalWidth > 0) {
+    ctx.drawImage(image, x, y, width, height);
+    return;
+  }
+
+  ctx.save();
+  ctx.setLineDash([6, 4]);
+  ctx.strokeStyle = '#94a3b8';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x, y, width, height);
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#64748b';
+  ctx.font = '12px sans-serif';
+  ctx.fillText(element.metadata?.label || 'Loading...', x + 8, y + 18);
+  ctx.restore();
 }

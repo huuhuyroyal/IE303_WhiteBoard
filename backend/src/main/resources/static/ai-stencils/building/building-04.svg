@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 224.1 807.23">
+    <defs>
+        <style>
+            .cls-1{fill:#fff}.cls-2{fill:none;stroke:#231f20;stroke-miterlimit:10;stroke-width:5px}
+        </style>
+    </defs>
+    <title>
+        TheBigCity
+    </title>
+    <g id="Fills">
+        <path class="cls-1" d="M16.72 357.7h193.17v431.57H16.72z"/>
+        <path class="cls-1" d="M32.89 270.94h160.83v86.77H32.89z"/>
+        <path class="cls-1" d="M78.19 184.28h70.23v86.77H78.19z"/>
+        <path class="cls-1" d="M104.01 39.94h18.58v143.29h-18.58z"/>
+        <path class="cls-1" d="M56.61 428.7h21.58v39.61H56.61z"/>
+        <path class="cls-1" d="M147.61 428.7h21.58v39.61h-21.58z"/>
+        <path class="cls-1" d="M56.61 509.7h21.58v39.61H56.61z"/>
+        <path class="cls-1" d="M147.61 509.7h21.58v39.61h-21.58z"/>
+        <path class="cls-1" d="M56.61 590.7h21.58v39.61H56.61z"/>
+        <path class="cls-1" d="M147.61 590.7h21.58v39.61h-21.58z"/>
+        <path class="cls-1" d="M56.61 671.7h21.58v39.61H56.61z"/>
+        <path class="cls-1" d="M147.61 671.7h21.58v39.61h-21.58z"/>
+    </g>
+    <g id="Outlines">
+        <path class="cls-2" d="M16.72 357.7h193.17v431.57H16.72z"/>
+        <path class="cls-2" d="M32.89 270.94h160.83v86.77H32.89z"/>
+        <path class="cls-2" d="M78.19 184.28h70.23v86.77H78.19z"/>
+        <path class="cls-2" d="M104.01 39.94h18.58v143.29h-18.58z"/>
+        <path class="cls-2" d="M168.61 271.05v86.65"/>
+        <path class="cls-2" d="M140.61 271.05v86.65"/>
+        <path class="cls-2" d="M56.61 271.05v86.65"/>
+        <path class="cls-2" d="M84.61 271.05v86.65"/>
+        <path class="cls-2" d="M112.61 271.05v86.65"/>
+        <path class="cls-2" d="M56.61 428.7h21.58v39.61H56.61z"/>
+        <path class="cls-2" d="M147.61 428.7h21.58v39.61h-21.58z"/>
+        <path class="cls-2" d="M56.61 509.7h21.58v39.61H56.61z"/>
+        <path class="cls-2" d="M147.61 509.7h21.58v39.61h-21.58z"/>
+        <path class="cls-2" d="M56.61 590.7h21.58v39.61H56.61z"/>
+        <path class="cls-2" d="M147.61 590.7h21.58v39.61h-21.58z"/>
+        <path class="cls-2" d="M56.61 671.7h21.58v39.61H56.61z"/>
+        <path class="cls-2" d="M147.61 671.7h21.58v39.61h-21.58z"/>
+    </g>
+</svg>
