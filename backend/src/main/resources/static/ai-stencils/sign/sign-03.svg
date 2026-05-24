@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 103.63 191.77">
+    <defs>
+        <style>
+            .cls-1{fill:#fff}.cls-2{fill:none;stroke:#231f20;stroke-miterlimit:10;stroke-width:5px}
+        </style>
+    </defs>
+    <title>
+        TheBigCity
+    </title>
+    <g id="Fills">
+        <path class="cls-1" d="M45.96 84.08h8.62v62h-8.62z"/>
+        <path class="cls-1" d="M63.07 38.4H37.46l-12.8 22.18 12.8 22.18h25.61l12.81-22.18L63.07 38.4z"/>
+    </g>
+    <g id="Outlines">
+        <path class="cls-2" d="M45.96 82.76h8.62v63.32h-8.62z"/>
+        <path class="cls-2" d="M75.88 60.58L63.07 38.4H37.46l-12.8 22.18 12.8 22.18h25.61l12.81-22.18z"/>
+    </g>
+</svg>

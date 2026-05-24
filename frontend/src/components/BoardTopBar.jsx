@@ -7,12 +7,13 @@ export default function BoardTopBar({
   isEditingTitle,
   setIsEditingTitle,
   handleBack,
-  handleTitleUpdate
+  handleTitleUpdate,
+  className = '',
 }) {
   const titleInputRef = useRef(null);
 
   return (
-    <div className="absolute top-4 left-4 bg-white px-3 py-2 rounded-lg shadow-sm border border-slate-200 flex items-center gap-3 z-10">
+    <div className={`absolute left-4 bg-white px-3 py-2 rounded-lg shadow-sm border border-slate-200 flex items-center gap-3 z-10 transition-all ${className}`}>
       <button
         onClick={handleBack}
         className="text-slate-400 hover:text-slate-700 transition-colors p-1 rounded-md hover:bg-slate-100"
