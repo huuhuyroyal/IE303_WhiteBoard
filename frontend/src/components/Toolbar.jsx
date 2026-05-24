@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   Pencil, Square, Circle, Triangle, MousePointer2,
   Eraser, Minus, StickyNote, Diamond,
-  Highlighter, Hand
+  Highlighter, Hand, ArrowRight, Star, Hexagon
 } from 'lucide-react';
 import ColorPicker from './ColorPicker';
 
@@ -62,10 +62,13 @@ const PEN_ITEMS = [
 
 const SHAPE_ITEMS = [
   { tool: 'line', icon: <Minus size={18} />, label: 'Line', title: 'Line (L)' },
+  { tool: 'arrow', icon: <ArrowRight size={18} />, label: 'Arrow', title: 'Arrow (A)' },
   { tool: 'rectangle', icon: <Square size={18} />, label: 'Rectangle', title: 'Rectangle (R)' },
   { tool: 'circle', icon: <Circle size={18} />, label: 'Circle', title: 'Circle (C)' },
   { tool: 'triangle', icon: <Triangle size={18} />, label: 'Triangle', title: 'Triangle (T)' },
   { tool: 'diamond', icon: <Diamond size={18} />, label: 'Diamond', title: 'Diamond (D)' },
+  { tool: 'star', icon: <Star size={18} />, label: 'Star', title: 'Star (S)' },
+  { tool: 'hexagon', icon: <Hexagon size={18} />, label: 'Hexagon', title: 'Hexagon (X)' },
 ];
 
 export default function Toolbar({ tool, setTool, color, setColor, strokeWidth, setStrokeWidth }) {

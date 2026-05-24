@@ -17,7 +17,15 @@ export default function useCamera(canvasRef, setCamera) {
           return { x: newX, y: newY, zoom: newZoom };
         });
       } else {
-        setCamera(prev => ({ x: prev.x - e.deltaX, y: prev.y - e.deltaY, zoom: prev.zoom }));
+        let dx = e.deltaX;
+        let dy = e.deltaY;
+
+        if (e.shiftKey && e.deltaY !== 0) {
+          dx = e.deltaY;
+          dy = 0;
+        }
+
+        setCamera(prev => ({ x: prev.x - dx, y: prev.y - dy, zoom: prev.zoom }));
       }
     };
 

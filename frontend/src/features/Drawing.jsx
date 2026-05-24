@@ -19,6 +19,10 @@ export function useDrawingFeature({
   strokeWidth,
   onBoardChanged,
   onPencilStrokeComplete,
+  onToolChange,
+  onElementSelected,
+  onInteractionStart,
+  onInteractionEnd,
 }) {
   const canvasRef = useRef(null);
   const elementsRef = useRef([]);
@@ -28,17 +32,47 @@ export function useDrawingFeature({
   const shapePreviewRef = useRef(null);
   const isPanningRef = useRef(false);
   const lastPanPointRef = useRef({ x: 0, y: 0 });
-  const selectedElementIdRef = useRef(null);
-  const isScalingRef = useRef(false);
+  const selectedIdsRef = useRef([]);
+  const resizeModeRef = useRef(null);
   const isDraggingShapeRef = useRef(false);
   const dragStartPosRef = useRef({ x: 0, y: 0 });
+  const hasMovedRef = useRef(false);
+  const clickedTargetRef = useRef(null);
   const originalPointsRef = useRef(null);
+  const selectionBoxRef = useRef(null);
+  const undoStackRef = useRef([]);
 
   const [elements, setElements] = useState([]);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [selectedElementId, setSelectedElementId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
   const [canvasCursor, setCanvasCursor] = useState(null);
   const [previewVersion, setPreviewVersion] = useState(0);
+
+  const pushToUndo = (action) => {
+    undoStackRef.current.push(action);
+    if (undoStackRef.current.length > 50) undoStackRef.current.shift();
+  };
+
+  // Allow updating element color dynamically
+  useEffect(() => {
+    if (selectedIds.length === 1 && color) {
+      const activeId = selectedIds[0];
+      const element = elementsRef.current.find(e => e.id === activeId);
+      if (element && element.color !== color && element.type !== 'ai-svg') {
+        const oldElement = JSON.parse(JSON.stringify(element));
+        const newElement = { ...element, color };
+        setElements(prev => {
+          const next = prev.map(e => e.id === activeId ? newElement : e);
+          elementsRef.current = next;
+          return next;
+        });
+        saveStroke(newElement, 'PUT');
+        pushToUndo({ type: 'MODIFY', oldElement });
+        bumpPreview();
+      }
+    }
+  }, [color, selectedIds]);
+
 
   useEffect(() => {
     if (!boardId) return;
@@ -158,11 +192,18 @@ export function useDrawingFeature({
       body: JSON.stringify(payload),
     }).catch((err) => console.error('Failed to persist stroke:', err));
 
-    publish('/app/draw', payload);
+    publish(method === 'POST' ? '/app/draw' : '/app/draw', payload);
     onBoardChanged?.();
   };
 
-  const deleteStroke = (id) => {
+  const deleteStroke = (id, skipHistory = false) => {
+    const elementToDelete = elementsRef.current.find((item) => item.id === id);
+    if (!elementToDelete) return;
+    
+    if (!skipHistory) {
+      pushToUndo({ type: 'DELETE', element: elementToDelete });
+    }
+
     setElements((prev) => {
       const next = prev.filter((item) => item.id !== id);
       elementsRef.current = next;
@@ -179,9 +220,15 @@ export function useDrawingFeature({
   };
 
   const handlePointerDown = (event) => {
+    try {
+      if (event && event.target && event.target.setPointerCapture) {
+        event.target.setPointerCapture(event.pointerId);
+      }
+    } catch (e) {}
+
     if (tool !== 'select') {
-      selectedElementIdRef.current = null;
-      setSelectedElementId(null);
+      selectedIdsRef.current = [];
+      setSelectedIds([]);
       setCanvasCursor(null);
     }
 
@@ -194,25 +241,91 @@ export function useDrawingFeature({
     const { x, y } = getWorldPos(event.clientX, event.clientY);
 
     if (tool === 'select') {
+      if (selectedIdsRef.current.length === 1) {
+        const activeId = selectedIdsRef.current[0];
+        const target = elementsRef.current.find(e => e.id === activeId);
+        if (target && (isShapeTool(target.type) || target.type === 'ai-svg')) {
+          const p1 = target.points[0];
+          const p2 = target.points[target.points.length - 1];
+          const xMin = Math.min(p1.x, p2.x);
+          const yMin = Math.min(p1.y, p2.y);
+          const xMax = Math.max(p1.x, p2.x);
+          const yMax = Math.max(p1.y, p2.y);
+          const w = xMax - xMin;
+          const h = yMax - yMin;
+          const handleSize = 15 / camera.zoom;
+
+          const handles = {
+            'tl': [xMin, yMin], 'tc': [xMin + w/2, yMin], 'tr': [xMax, yMin],
+            'ml': [xMin, yMin + h/2],                     'mr': [xMax, yMin + h/2],
+            'bl': [xMin, yMax], 'bc': [xMin + w/2, yMax], 'br': [xMax, yMax]
+          };
+
+          for (const [key, [hx, hy]] of Object.entries(handles)) {
+            if (Math.hypot(x - hx, y - hy) <= handleSize) {
+              resizeModeRef.current = key;
+              isDraggingShapeRef.current = false;
+              dragStartPosRef.current = { x, y };
+              originalPointsRef.current = [{ id: target.id, points: JSON.parse(JSON.stringify(target.points)) }];
+              hasMovedRef.current = false;
+              return;
+            }
+          }
+        }
+      }
+
       const target = findElementAtPoint(x, y);
 
-      if (target && (isShapeTool(target.type) || target.type === 'ai-svg')) {
-        const p1 = target.points[0];
-        const p2 = target.points[target.points.length - 1];
-        const xMax = Math.max(p1.x, p2.x);
-        const yMax = Math.max(p1.y, p2.y);
-        const handleSize = 8 / camera.zoom;
+      let groupClicked = false;
+      if (selectedIdsRef.current.length > 1) {
+          const selectedElements = elementsRef.current.filter(e => selectedIdsRef.current.includes(e.id));
+          if (selectedElements.length > 0) {
+              let xMin = Infinity, yMin = Infinity, xMax = -Infinity, yMax = -Infinity;
+              selectedElements.forEach(el => {
+                 el.points?.forEach(p => {
+                    if (p.x < xMin) xMin = p.x;
+                    if (p.y < yMin) yMin = p.y;
+                    if (p.x > xMax) xMax = p.x;
+                    if (p.y > yMax) yMax = p.y;
+                 });
+              });
+              if (x >= xMin && x <= xMax && y >= yMin && y <= yMax) {
+                 groupClicked = true;
+              }
+          }
+      }
 
-        isScalingRef.current = Math.hypot(x - xMax, y - yMax) < handleSize * 2;
-        isDraggingShapeRef.current = !isScalingRef.current;
-        selectedElementIdRef.current = target.id;
+      if (groupClicked || (target && (isShapeTool(target.type) || target.type === 'ai-svg'))) {
+        resizeModeRef.current = null;
+        isDraggingShapeRef.current = true;
+        hasMovedRef.current = false;
+        clickedTargetRef.current = target ? target.id : null;
+        
+        if (target && !groupClicked && !selectedIdsRef.current.includes(target.id)) {
+          if (target.metadata?.groupId) {
+            const groupIds = elementsRef.current.filter(e => e.metadata?.groupId === target.metadata.groupId).map(e => e.id);
+            selectedIdsRef.current = groupIds;
+          } else {
+            selectedIdsRef.current = [target.id];
+          }
+        }
+        
         dragStartPosRef.current = { x, y };
-        originalPointsRef.current = JSON.parse(JSON.stringify(target.points));
-        setSelectedElementId(target.id);
+        originalPointsRef.current = elementsRef.current
+          .filter(e => selectedIdsRef.current.includes(e.id))
+          .map(e => ({ id: e.id, points: JSON.parse(JSON.stringify(e.points)) }));
+          
+        setSelectedIds([...selectedIdsRef.current]);
+        updateSelectedElementCallback();
         bumpPreview();
       } else {
-        selectedElementIdRef.current = null;
-        setSelectedElementId(null);
+        selectedIdsRef.current = [];
+        setSelectedIds([]);
+        updateSelectedElementCallback();
+        
+        selectionBoxRef.current = { startX: x, startY: y, endX: x, endY: y };
+        setCanvasCursor(null);
+        hasMovedRef.current = false;
         bumpPreview();
       }
 
@@ -220,6 +333,7 @@ export function useDrawingFeature({
     }
 
     if (tool === 'eraser') {
+      setIsDrawing(true);
       const target = findElementAtPoint(x, y);
       if (target) deleteStroke(target.id);
       return;
@@ -258,22 +372,50 @@ export function useDrawingFeature({
     const { x, y } = getWorldPos(event.clientX, event.clientY);
 
     if (tool === 'select') {
-      if (isScalingRef.current && selectedElementIdRef.current && originalPointsRef.current) {
+      if (selectionBoxRef.current) {
+        const dx = x - selectionBoxRef.current.startX;
+        const dy = y - selectionBoxRef.current.startY;
+        if (!hasMovedRef.current && Math.hypot(dx, dy) > 2) {
+          hasMovedRef.current = true;
+          onInteractionStart?.();
+        }
+        
+        if (hasMovedRef.current) {
+          selectionBoxRef.current.endX = x;
+          selectionBoxRef.current.endY = y;
+          bumpPreview();
+        }
+        return;
+      }
+
+      if (resizeModeRef.current && selectedIdsRef.current.length === 1 && originalPointsRef.current) {
+        if (!hasMovedRef.current) {
+          hasMovedRef.current = true;
+          onInteractionStart?.();
+        }
         const dx = x - dragStartPosRef.current.x;
         const dy = y - dragStartPosRef.current.y;
-        const p1 = originalPointsRef.current[0];
-        const p2 = originalPointsRef.current[originalPointsRef.current.length - 1];
-        let nextP1 = { ...p1 };
-        let nextP2 = { ...p2 };
+        
+        const activeId = selectedIdsRef.current[0];
+        const original = originalPointsRef.current[0];
+        const p1 = original.points[0];
+        const p2 = original.points[original.points.length - 1];
+        let xMin = Math.min(p1.x, p2.x);
+        let yMin = Math.min(p1.y, p2.y);
+        let xMax = Math.max(p1.x, p2.x);
+        let yMax = Math.max(p1.y, p2.y);
 
-        if (p1.x >= p2.x) nextP1.x = p1.x + dx;
-        else nextP2.x = p2.x + dx;
+        const mode = resizeModeRef.current;
+        if (mode.includes('l')) xMin += dx;
+        if (mode.includes('r')) xMax += dx;
+        if (mode.includes('t')) yMin += dy;
+        if (mode.includes('b')) yMax += dy;
 
-        if (p1.y >= p2.y) nextP1.y = p1.y + dy;
-        else nextP2.y = p2.y + dy;
+        const nextP1 = { x: xMin, y: yMin };
+        const nextP2 = { x: xMax, y: yMax };
 
         setElements((prev) => {
-          const next = prev.map((item) => item.id === selectedElementIdRef.current
+          const next = prev.map((item) => item.id === activeId
             ? { ...item, points: [nextP1, nextP2] }
             : item);
           elementsRef.current = next;
@@ -283,28 +425,104 @@ export function useDrawingFeature({
         return;
       }
 
-      if (isDraggingShapeRef.current && selectedElementIdRef.current && originalPointsRef.current) {
+      if (isDraggingShapeRef.current && originalPointsRef.current) {
         const dx = x - dragStartPosRef.current.x;
         const dy = y - dragStartPosRef.current.y;
-        const movedPoints = originalPointsRef.current.map((point) => ({ x: point.x + dx, y: point.y + dy }));
+        
+        if (!hasMovedRef.current && Math.hypot(dx, dy) > 2) {
+          hasMovedRef.current = true;
+          onInteractionStart?.();
+        }
 
-        setElements((prev) => {
-          const next = prev.map((item) => item.id === selectedElementIdRef.current
-            ? { ...item, points: movedPoints }
-            : item);
-          elementsRef.current = next;
-          return next;
-        });
-        bumpPreview();
+        if (hasMovedRef.current) {
+          setElements((prev) => {
+            const next = prev.map((item) => {
+              const original = originalPointsRef.current.find(o => o.id === item.id);
+              if (original) {
+                return {
+                  ...item,
+                  points: original.points.map((p) => ({
+                    x: p.x + dx,
+                    y: p.y + dy,
+                  })),
+                };
+              }
+              return item;
+            });
+            elementsRef.current = next;
+            return next;
+          });
+          bumpPreview();
+        }
         return;
       }
 
-      setCanvasCursor(selectedElementIdRef.current ? 'move' : 'default');
+      let hoverCursor = 'default';
+      if (!isDraggingShapeRef.current && !resizeModeRef.current && selectedIdsRef.current.length === 1) {
+        const activeId = selectedIdsRef.current[0];
+        const target = elementsRef.current.find(e => e.id === activeId);
+        if (target && (isShapeTool(target.type) || target.type === 'ai-svg')) {
+          const p1 = target.points[0];
+          const p2 = target.points[target.points.length - 1];
+          const xMin = Math.min(p1.x, p2.x);
+          const yMin = Math.min(p1.y, p2.y);
+          const xMax = Math.max(p1.x, p2.x);
+          const yMax = Math.max(p1.y, p2.y);
+          const w = xMax - xMin;
+          const h = yMax - yMin;
+          const handleSize = 10 / camera.zoom;
+
+          const handles = {
+            'tl': [xMin, yMin], 'tc': [xMin + w/2, yMin], 'tr': [xMax, yMin],
+            'ml': [xMin, yMin + h/2],                     'mr': [xMax, yMin + h/2],
+            'bl': [xMin, yMax], 'bc': [xMin + w/2, yMax], 'br': [xMax, yMax]
+          };
+
+          for (const [key, [hx, hy]] of Object.entries(handles)) {
+            if (Math.hypot(x - hx, y - hy) <= handleSize) {
+              if (['tl', 'br'].includes(key)) hoverCursor = 'nwse-resize';
+              else if (['tr', 'bl'].includes(key)) hoverCursor = 'nesw-resize';
+              else if (['tc', 'bc'].includes(key)) hoverCursor = 'ns-resize';
+              else if (['ml', 'mr'].includes(key)) hoverCursor = 'ew-resize';
+              break;
+            }
+          }
+        }
+      }
+      if (hoverCursor === 'default' && selectedIdsRef.current.length > 0) {
+        // Only show 'move' cursor if we are actually hovering over the group or an element
+        const isGroupHovered = () => {
+          if (selectedIdsRef.current.length === 1) {
+            const target = findElementAtPoint(x, y);
+            return target && target.id === selectedIdsRef.current[0];
+          } else {
+            const selectedElements = elementsRef.current.filter(e => selectedIdsRef.current.includes(e.id));
+            let xMin = Infinity, yMin = Infinity, xMax = -Infinity, yMax = -Infinity;
+            selectedElements.forEach(el => {
+               el.points?.forEach(p => {
+                  if (p.x < xMin) xMin = p.x;
+                  if (p.y < yMin) yMin = p.y;
+                  if (p.x > xMax) xMax = p.x;
+                  if (p.y > yMax) yMax = p.y;
+               });
+            });
+            return (x >= xMin && x <= xMax && y >= yMin && y <= yMax);
+          }
+        };
+        if (isGroupHovered()) hoverCursor = 'move';
+      }
+      setCanvasCursor(hoverCursor);
       bumpPreview();
       return;
     }
 
     if (!isDrawing) return;
+
+    if (tool === 'eraser') {
+      const target = findElementAtPoint(x, y);
+      if (target) deleteStroke(target.id);
+      return;
+    }
 
     if (tool === 'pencil' || tool === 'highlighter') {
       currentPathRef.current.push({ x, y });
@@ -326,23 +544,156 @@ export function useDrawingFeature({
     }
   };
 
-  const handlePointerUp = () => {
+  const updateSelectedElementCallback = () => {
+    if (selectedIdsRef.current.length === 0) {
+       onElementSelected?.(null);
+    } else if (selectedIdsRef.current.length === 1) {
+       const el = elementsRef.current.find(e => e.id === selectedIdsRef.current[0]);
+       onElementSelected?.(el || null);
+    } else {
+       const selectedElements = elementsRef.current.filter(e => selectedIdsRef.current.includes(e.id));
+       let xMin = Infinity, yMin = Infinity, xMax = -Infinity, yMax = -Infinity;
+       selectedElements.forEach(el => {
+          el.points?.forEach(p => {
+             if (p.x < xMin) xMin = p.x;
+             if (p.y < yMin) yMin = p.y;
+             if (p.x > xMax) xMax = p.x;
+             if (p.y > yMax) yMax = p.y;
+          });
+       });
+
+       const groupIds = new Set(selectedElements.map(e => e.metadata?.groupId).filter(Boolean));
+       const commonGroupId = (groupIds.size === 1 && selectedElements.every(e => e.metadata?.groupId)) 
+           ? Array.from(groupIds)[0] 
+           : null;
+
+       onElementSelected?.({
+          id: 'group',
+          type: 'group',
+          points: [{ x: xMin, y: yMin }, { x: xMax, y: yMax }],
+          selectedIds: selectedIdsRef.current,
+          metadata: { groupId: commonGroupId }
+       });
+    }
+  };
+
+  const handlePointerUp = (event) => {
+    try {
+      if (event && event.target && event.target.releasePointerCapture) {
+        event.target.releasePointerCapture(event.pointerId);
+      }
+    } catch (e) {}
+
     if (isPanningRef.current) {
       isPanningRef.current = false;
       return;
     }
 
     if (tool === 'select') {
-      const activeId = selectedElementIdRef.current;
-      const changed = isScalingRef.current || isDraggingShapeRef.current;
+      if (selectionBoxRef.current) {
+        const { startX, startY, endX, endY } = selectionBoxRef.current;
+        const width = Math.abs(endX - startX);
+        const height = Math.abs(endY - startY);
 
-      isScalingRef.current = false;
-      isDraggingShapeRef.current = false;
+        if (width < 3 && height < 3) {
+           selectedIdsRef.current = [];
+           setSelectedIds([]);
+           updateSelectedElementCallback();
+        } else {
+          const xMin = Math.min(startX, endX);
+          const yMin = Math.min(startY, endY);
+          const xMax = Math.max(startX, endX);
+          const yMax = Math.max(startY, endY);
+          
+          const inside = elementsRef.current.filter(el => {
+             if (!el.points || el.points.length === 0) return false;
+             const exMin = Math.min(...el.points.map(p => p.x));
+             const eyMin = Math.min(...el.points.map(p => p.y));
+             const exMax = Math.max(...el.points.map(p => p.x));
+             const eyMax = Math.max(...el.points.map(p => p.y));
+             return !(exMin > xMax || exMax < xMin || eyMin > yMax || eyMax < yMin);
+          });
 
-      if (changed && activeId) {
-        const element = elementsRef.current.find((item) => item.id === activeId);
-        if (element) saveStroke(element, 'PUT');
+          if (inside.length > 0) {
+             let newIds = new Set(inside.map(e => e.id));
+             inside.forEach(e => {
+                if (e.metadata?.groupId) {
+                   elementsRef.current.forEach(el => {
+                      if (el.metadata?.groupId === e.metadata.groupId) {
+                         newIds.add(el.id);
+                      }
+                   });
+                }
+             });
+             const finalIds = Array.from(newIds);
+             selectedIdsRef.current = finalIds;
+             setSelectedIds(finalIds);
+             updateSelectedElementCallback();
+          } else {
+             selectedIdsRef.current = [];
+             setSelectedIds([]);
+             updateSelectedElementCallback();
+          }
+        }
+        
+        selectionBoxRef.current = null;
+        if (hasMovedRef.current) onInteractionEnd?.();
+        bumpPreview();
+        return;
       }
+
+      const changed = resizeModeRef.current || (isDraggingShapeRef.current && hasMovedRef.current);
+
+      if (isDraggingShapeRef.current && !hasMovedRef.current) {
+        if (!clickedTargetRef.current) {
+          // Single click on empty space inside the group
+          selectedIdsRef.current = [];
+          setSelectedIds([]);
+          updateSelectedElementCallback();
+          setCanvasCursor(null);
+          resizeModeRef.current = null;
+          isDraggingShapeRef.current = false;
+          bumpPreview();
+          return;
+        } else if (selectedIdsRef.current.length > 1 && selectedIdsRef.current.includes(clickedTargetRef.current)) {
+          // Check if this is a permanent group
+          const clickedEl = elementsRef.current.find(e => e.id === clickedTargetRef.current);
+          const isPermanentGroup = clickedEl?.metadata?.groupId && selectedIdsRef.current.every(id => {
+             const el = elementsRef.current.find(e => e.id === id);
+             return el?.metadata?.groupId === clickedEl.metadata.groupId;
+          });
+
+          if (!isPermanentGroup) {
+            // Single click on a specific element inside a loose multi-selection
+            selectedIdsRef.current = [clickedTargetRef.current];
+            setSelectedIds([clickedTargetRef.current]);
+            updateSelectedElementCallback();
+            setCanvasCursor(null);
+            resizeModeRef.current = null;
+            isDraggingShapeRef.current = false;
+            if (hasMovedRef.current) onInteractionEnd?.();
+            bumpPreview();
+            return;
+          }
+        }
+      }
+
+      resizeModeRef.current = null;
+      isDraggingShapeRef.current = false;
+      setCanvasCursor(null);
+
+      if (changed && selectedIdsRef.current.length > 0) {
+        selectedIdsRef.current.forEach(id => {
+          const element = elementsRef.current.find((item) => item.id === id);
+          const original = originalPointsRef.current?.find(o => o.id === id);
+          if (element) {
+            saveStroke(element, 'PUT');
+            pushToUndo({ type: 'MODIFY', oldElement: original ? { ...element, points: original.points } : element });
+          }
+        });
+        updateSelectedElementCallback();
+      }
+      if (hasMovedRef.current) onInteractionEnd?.();
       bumpPreview();
       return;
     }
@@ -367,6 +718,7 @@ export function useDrawingFeature({
       });
       currentPathRef.current = [];
       saveStroke(next, 'POST');
+      pushToUndo({ type: 'ADD', element: next });
       if (tool === 'pencil') onPencilStrokeComplete?.(next);
       bumpPreview();
       return;
@@ -392,19 +744,25 @@ export function useDrawingFeature({
       });
       linePreviewRef.current = null;
       saveStroke(next, 'POST');
+      pushToUndo({ type: 'ADD', element: next });
       bumpPreview();
       return;
     }
 
     if (isShapeTool(tool) && shapePreviewRef.current) {
+      let p1 = { x: shapePreviewRef.current.startX, y: shapePreviewRef.current.startY };
+      let p2 = { x: shapePreviewRef.current.endX, y: shapePreviewRef.current.endY };
+
+      if (Math.hypot(p2.x - p1.x, p2.y - p1.y) < 5) {
+        p1 = { x: p1.x - 50, y: p1.y - 50 };
+        p2 = { x: p2.x + 50, y: p2.y + 50 };
+      }
+
       const next = {
         id: crypto.randomUUID(),
         boardId,
         type: tool,
-        points: [
-          { x: shapePreviewRef.current.startX, y: shapePreviewRef.current.startY },
-          { x: shapePreviewRef.current.endX, y: shapePreviewRef.current.endY },
-        ],
+        points: [p1, p2],
         color,
         width: strokeWidth,
         metadata: {},
@@ -416,7 +774,13 @@ export function useDrawingFeature({
       });
       shapePreviewRef.current = null;
       saveStroke(next, 'POST');
+      pushToUndo({ type: 'ADD', element: next });
       bumpPreview();
+      
+      onToolChange?.('select');
+      setSelectedElementId(next.id);
+      selectedElementIdRef.current = next.id;
+      onElementSelected?.(next);
     }
   };
 
@@ -425,8 +789,11 @@ export function useDrawingFeature({
     if (!canvas) return undefined;
 
     const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
     };
 
     resize();
@@ -444,6 +811,8 @@ export function useDrawingFeature({
     ctx.lineJoin = 'round';
 
     ctx.save();
+    const dpr = window.devicePixelRatio || 1;
+    ctx.scale(dpr, dpr);
     ctx.translate(camera.x, camera.y);
     ctx.scale(camera.zoom, camera.zoom);
 
@@ -462,7 +831,7 @@ export function useDrawingFeature({
       } else if (element.type === 'ai-svg') {
         drawSvgElement(ctx, element, imageCacheRef.current, bumpPreview);
       } else if (isShapeTool(element.type)) {
-        drawShapeElement(ctx, element.type, element.points);
+        drawShapeElement(ctx, element);
       }
 
       ctx.globalAlpha = 1;
@@ -493,46 +862,87 @@ export function useDrawingFeature({
     }
 
     if (tool === 'line' && linePreviewRef.current) {
-      ctx.setLineDash([8, 4]);
       ctx.lineWidth = strokeWidth;
-      ctx.strokeStyle = color;
-      drawShapeElement(ctx, 'line', [
-        { x: linePreviewRef.current.startX, y: linePreviewRef.current.startY },
-        { x: linePreviewRef.current.endX, y: linePreviewRef.current.endY },
-      ]);
-      ctx.setLineDash([]);
+      drawShapeElement(ctx, {
+        type: 'line',
+        points: [
+          { x: linePreviewRef.current.startX, y: linePreviewRef.current.startY },
+          { x: linePreviewRef.current.endX, y: linePreviewRef.current.endY },
+        ],
+        color,
+        metadata: { strokeStyle: 'dashed' }
+      });
     }
 
     if (isShapeTool(tool) && shapePreviewRef.current) {
-      ctx.setLineDash([8, 4]);
       ctx.lineWidth = strokeWidth;
-      ctx.strokeStyle = color;
-      drawShapeElement(ctx, tool, [
-        { x: shapePreviewRef.current.startX, y: shapePreviewRef.current.startY },
-        { x: shapePreviewRef.current.endX, y: shapePreviewRef.current.endY },
-      ]);
-      ctx.setLineDash([]);
+      drawShapeElement(ctx, {
+        type: tool,
+        points: [
+          { x: shapePreviewRef.current.startX, y: shapePreviewRef.current.startY },
+          { x: shapePreviewRef.current.endX, y: shapePreviewRef.current.endY },
+        ],
+        color,
+        metadata: { strokeStyle: 'dashed' }
+      });
     }
 
-    if (selectedElementId) {
-      const selected = elements.find((item) => item.id === selectedElementId);
-      if (selected && selected.points.length >= 2) {
-        const [p1, p2] = selected.points;
-        const xMin = Math.min(p1.x, p2.x);
-        const yMin = Math.min(p1.y, p2.y);
-        const xMax = Math.max(p1.x, p2.x);
-        const yMax = Math.max(p1.y, p2.y);
+    if (selectedIds.length > 0) {
+      const selectedElements = elements.filter(e => selectedIds.includes(e.id));
+      if (selectedElements.length > 0) {
+        let xMin = Infinity, yMin = Infinity, xMax = -Infinity, yMax = -Infinity;
+        selectedElements.forEach(el => {
+           el.points?.forEach(p => {
+              if (p.x < xMin) xMin = p.x;
+              if (p.y < yMin) yMin = p.y;
+              if (p.x > xMax) xMax = p.x;
+              if (p.y > yMax) yMax = p.y;
+           });
+        });
+        const w = xMax - xMin;
+        const h = yMax - yMin;
 
         ctx.strokeStyle = '#3b82f6';
         ctx.lineWidth = 1.5 / camera.zoom;
         ctx.setLineDash([6, 4]);
-        ctx.strokeRect(xMin, yMin, xMax - xMin, yMax - yMin);
+        ctx.strokeRect(xMin, yMin, w, h);
         ctx.setLineDash([]);
+
+        if (selectedIds.length === 1) {
+          const handleSize = 8 / camera.zoom;
+          ctx.fillStyle = '#ffffff';
+          const handles = [
+            [xMin, yMin], [xMin + w/2, yMin], [xMax, yMin],
+            [xMin, yMin + h/2],               [xMax, yMin + h/2],
+            [xMin, yMax], [xMin + w/2, yMax], [xMax, yMax]
+          ];
+          
+          handles.forEach(([hx, hy]) => {
+            ctx.beginPath();
+            ctx.arc(hx, hy, handleSize / 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+          });
+        }
       }
     }
 
+    if (selectionBoxRef.current) {
+      const { startX, startY, endX, endY } = selectionBoxRef.current;
+      const sx = Math.min(startX, endX);
+      const sy = Math.min(startY, endY);
+      const sw = Math.abs(endX - startX);
+      const sh = Math.abs(endY - startY);
+
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 1 / camera.zoom;
+      ctx.fillRect(sx, sy, sw, sh);
+      ctx.strokeRect(sx, sy, sw, sh);
+    }
+
     ctx.restore();
-  }, [camera, color, elements, previewVersion, selectedElementId, strokeWidth, tool]);
+  }, [camera, color, elements, previewVersion, selectedIds, strokeWidth, tool]);
 
   const cursor = tool === 'hand'
     ? 'grab'
@@ -613,6 +1023,107 @@ export function useDrawingFeature({
     bumpPreview();
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        const lastAction = undoStackRef.current.pop();
+        if (!lastAction) return;
+
+        if (lastAction.type === 'ADD') {
+          deleteStroke(lastAction.element.id, true);
+        } else if (lastAction.type === 'DELETE') {
+          setElements((prev) => {
+            const all = [...prev, lastAction.element];
+            elementsRef.current = all;
+            return all;
+          });
+          saveStroke(lastAction.element, 'POST');
+          bumpPreview();
+        } else if (lastAction.type === 'MODIFY') {
+          setElements((prev) => {
+            const next = prev.map(item => item.id === lastAction.oldElement.id ? lastAction.oldElement : item);
+            elementsRef.current = next;
+            return next;
+          });
+          saveStroke(lastAction.oldElement, 'PUT');
+          bumpPreview();
+        } else if (lastAction.type === 'ADD_MULTIPLE') {
+          lastAction.elements.forEach(el => deleteStroke(el.id, true));
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        if (selectedIdsRef.current.length > 0) {
+          duplicateElements(selectedIdsRef.current);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [boardId]);
+
+  const duplicateElements = (ids) => {
+    const elementsToDuplicate = elementsRef.current.filter(e => ids.includes(e.id));
+    if (elementsToDuplicate.length === 0) return;
+
+    const groupIds = new Set(elementsToDuplicate.map(e => e.metadata?.groupId).filter(Boolean));
+    const commonGroupId = (groupIds.size === 1 && elementsToDuplicate.every(e => e.metadata?.groupId)) 
+        ? crypto.randomUUID() 
+        : null;
+
+    const offset = 50;
+    const newElements = elementsToDuplicate.map(element => {
+      const clone = JSON.parse(JSON.stringify(element));
+      clone.id = crypto.randomUUID();
+      clone.points = clone.points.map(p => ({ x: p.x + offset, y: p.y + offset }));
+      if (commonGroupId) {
+         clone.metadata = { ...(clone.metadata || {}), groupId: commonGroupId };
+      } else if (clone.metadata?.groupId) {
+         delete clone.metadata.groupId;
+      }
+      return clone;
+    });
+
+    setElements(prev => {
+      const all = [...prev, ...newElements];
+      elementsRef.current = all;
+      return all;
+    });
+
+    newElements.forEach(el => saveStroke(el, 'POST'));
+    pushToUndo({ type: 'ADD_MULTIPLE', elements: newElements });
+
+    const newIds = newElements.map(e => e.id);
+    selectedIdsRef.current = newIds;
+    setSelectedIds(newIds);
+    updateSelectedElementCallback();
+    bumpPreview();
+  };
+
+  const updateElement = (id, updates) => {
+    const element = elementsRef.current.find(e => e.id === id);
+    if (!element) return;
+    const oldElement = JSON.parse(JSON.stringify(element));
+    const next = { 
+      ...element, 
+      ...updates,
+      metadata: { ...(element.metadata || {}), ...(updates.metadata || {}) }
+    };
+    
+    setElements((prev) => {
+      const all = prev.map(e => e.id === id ? next : e);
+      elementsRef.current = all;
+      return all;
+    });
+    saveStroke(next, 'PUT');
+    pushToUndo({ type: 'MODIFY', oldElement });
+    
+    if (selectedIdsRef.current.length === 1 && selectedIdsRef.current[0] === id) {
+      onElementSelected?.(next);
+    }
+    bumpPreview();
+  };
+
   return {
     canvasRef,
     cursor,
@@ -621,6 +1132,8 @@ export function useDrawingFeature({
     handlePointerUp,
     removeElement,
     replaceElementWithSuggestion,
+    duplicateElements,
+    updateElement,
   };
 }
 
