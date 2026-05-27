@@ -59,6 +59,29 @@ cd backend
 
 Fill in `backend/src/main/resources/application.properties`.
 
+```bash
+
+# Database connection URL
+spring.datasource.url=jdbc:postgresql://YOUR_NEON_DB_HOST/neondb?sslmode=require
+
+# Database username
+spring.datasource.username=YOUR_NEON_DB_USERNAME
+
+# Database password
+spring.datasource.password=YOUR_DATABASE_PASSWORD_HERE
+
+# PostgreSQL Driver
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+
+# Hibernate auto table update configuration
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+
+server.port=5000
+
+```
+
 **Run development server:**
 
 ```bash
