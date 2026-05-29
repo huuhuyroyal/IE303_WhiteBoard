@@ -24,6 +24,9 @@ public class BoardController {
     private UserRepository userRepository;
     @Autowired
     private com.example.backend_Whiteboard.repository.BoardMemberRepository boardMemberRepository;
+    
+    @Autowired
+    private com.example.backend_Whiteboard.repository.PermissionRequestRepository permissionRequestRepository;
 
     @Autowired
     private com.example.backend_Whiteboard.config.JwtUtil jwtUtil;
@@ -172,6 +175,152 @@ public class BoardController {
                 "owner", board.getOwner().getUsername(),
                 "members", usernames
             ));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // POST /api/board/{id}/request-access
+    @PostMapping("/{id}/request-access")
+    public ResponseEntity<?> requestAccess(@PathVariable UUID id,
+                                           @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
+        try {
+            String token = authHeader.substring(7);
+            UUID userId = jwtUtil.getUserIdFromToken(token);
+
+            Board board = boardRepository.findById(id).orElse(null);
+            if (board == null) return ResponseEntity.status(404).body(Map.of("error", "Board not found"));
+
+            User user = userRepository.findById(userId).orElse(null);
+            if (user == null) return ResponseEntity.status(404).body(Map.of("error", "User not found"));
+
+            // Check if already an owner or member
+            if (board.getOwner().getId().equals(userId) || 
+                boardMemberRepository.findByBoardId(id).stream().anyMatch(m -> m.getUser().getId().equals(userId))) {
+                return ResponseEntity.status(400).body(Map.of("error", "User already has access to this board"));
+            }
+
+            // Check if already requested
+            if (permissionRequestRepository.existsByBoardIdAndUserId(id, userId)) {
+                return ResponseEntity.status(400).body(Map.of("error", "Already requested"));
+            }
+
+            com.example.backend_Whiteboard.model.PermissionRequest req = new com.example.backend_Whiteboard.model.PermissionRequest(board, user);
+            permissionRequestRepository.save(req);
+            
+            return ResponseEntity.ok(Map.of("message", "Access requested successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // GET /api/board/{id}/requests
+    @GetMapping("/{id}/requests")
+    public ResponseEntity<?> getPendingRequests(@PathVariable UUID id,
+                                                @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
+        try {
+            String token = authHeader.substring(7);
+            UUID userId = jwtUtil.getUserIdFromToken(token);
+
+            Board board = boardRepository.findById(id).orElse(null);
+            if (board == null) return ResponseEntity.status(404).body(Map.of("error", "Board not found"));
+
+            // Only owner can see requests
+            if (!board.getOwner().getId().equals(userId)) {
+                return ResponseEntity.status(403).body(Map.of("error", "Only the owner can view access requests"));
+            }
+
+            List<com.example.backend_Whiteboard.model.PermissionRequest> requests = permissionRequestRepository.findByBoardId(id);
+            List<Map<String, Object>> pending = requests.stream()
+                .filter(r -> "PENDING".equals(r.getStatus()))
+                .map(r -> {
+                    Map<String, Object> map = new java.util.HashMap<>();
+                    map.put("id", r.getId());
+                    map.put("username", r.getUser().getUsername());
+                    map.put("userId", r.getUser().getId());
+                    return map;
+                }).toList();
+
+            return ResponseEntity.ok(pending);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // POST /api/board/{id}/requests/{requestId}/approve
+    @PostMapping("/{id}/requests/{requestId}/approve")
+    public ResponseEntity<?> approveRequest(@PathVariable UUID id, @PathVariable UUID requestId,
+                                            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
+        try {
+            String token = authHeader.substring(7);
+            UUID userId = jwtUtil.getUserIdFromToken(token);
+
+            Board board = boardRepository.findById(id).orElse(null);
+            if (board == null) return ResponseEntity.status(404).body(Map.of("error", "Board not found"));
+
+            // Only owner can approve
+            if (!board.getOwner().getId().equals(userId)) {
+                return ResponseEntity.status(403).body(Map.of("error", "Only the owner can approve access requests"));
+            }
+
+            com.example.backend_Whiteboard.model.PermissionRequest req = permissionRequestRepository.findById(requestId).orElse(null);
+            if (req == null || !req.getBoard().getId().equals(id)) {
+                return ResponseEntity.status(404).body(Map.of("error", "Request not found"));
+            }
+
+            req.setStatus("APPROVED");
+            permissionRequestRepository.save(req);
+
+            // Add user to board members
+            if (boardMemberRepository.findByBoardId(id).stream().noneMatch(m -> m.getUser().getId().equals(req.getUser().getId()))) {
+                BoardMember member = new BoardMember(board, req.getUser());
+                boardMemberRepository.save(member);
+            }
+
+            return ResponseEntity.ok(Map.of("message", "Request approved", "username", req.getUser().getUsername()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // POST /api/board/{id}/requests/{requestId}/reject
+    @PostMapping("/{id}/requests/{requestId}/reject")
+    public ResponseEntity<?> rejectRequest(@PathVariable UUID id, @PathVariable UUID requestId,
+                                            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
+        try {
+            String token = authHeader.substring(7);
+            UUID userId = jwtUtil.getUserIdFromToken(token);
+
+            Board board = boardRepository.findById(id).orElse(null);
+            if (board == null) return ResponseEntity.status(404).body(Map.of("error", "Board not found"));
+
+            // Only owner can reject
+            if (!board.getOwner().getId().equals(userId)) {
+                return ResponseEntity.status(403).body(Map.of("error", "Only the owner can reject access requests"));
+            }
+
+            com.example.backend_Whiteboard.model.PermissionRequest req = permissionRequestRepository.findById(requestId).orElse(null);
+            if (req == null || !req.getBoard().getId().equals(id)) {
+                return ResponseEntity.status(404).body(Map.of("error", "Request not found"));
+            }
+
+            req.setStatus("REJECTED");
+            permissionRequestRepository.save(req);
+            // Alternatively, could delete the request: permissionRequestRepository.delete(req);
+
+            return ResponseEntity.ok(Map.of("message", "Request rejected"));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }

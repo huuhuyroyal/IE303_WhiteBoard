@@ -15,6 +15,7 @@ export default function ShareModal({
   const [owner, setOwner] = useState(null);
   const [sharedUsers, setSharedUsers] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
+  const [pendingRequests, setPendingRequests] = useState([]);
 
   useEffect(() => {
     if (!boardId) return;
@@ -33,6 +34,20 @@ export default function ShareModal({
           const data = await res.json();
           setOwner(data.owner || null);
           setSharedUsers(Array.isArray(data.members) ? data.members : []);
+
+          // If the current user is the owner, fetch pending requests
+          if (data.owner === user?.username) {
+            const reqRes = await fetch(
+              `http://localhost:5000/api/board/${boardId}/requests`,
+              {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+              }
+            );
+            if (reqRes.ok) {
+              const reqData = await reqRes.json();
+              setPendingRequests(reqData);
+            }
+          }
         }
       } catch (err) {
         console.error("Failed to fetch members:", err);
@@ -102,6 +117,43 @@ export default function ShareModal({
     }
   };
 
+  const handleApprove = async (requestId, reqUsername) => {
+    try {
+      const token = user?.token;
+      const res = await fetch(
+        `http://localhost:5000/api/board/${boardId}/requests/${requestId}/approve`,
+        {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
+      );
+      if (res.ok) {
+        setPendingRequests(prev => prev.filter(r => r.id !== requestId));
+        setSharedUsers(prev => [...prev, reqUsername]);
+      }
+    } catch (err) {
+      console.error("Failed to approve request", err);
+    }
+  };
+
+  const handleReject = async (requestId) => {
+    try {
+      const token = user?.token;
+      const res = await fetch(
+        `http://localhost:5000/api/board/${boardId}/requests/${requestId}/reject`,
+        {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
+      );
+      if (res.ok) {
+        setPendingRequests(prev => prev.filter(r => r.id !== requestId));
+      }
+    } catch (err) {
+      console.error("Failed to reject request", err);
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 font-sans"
@@ -167,8 +219,47 @@ export default function ShareModal({
           )}
         </div>
 
+        {pendingRequests.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-[13px] font-medium text-amber-600 mb-3 uppercase tracking-wider">
+              Pending Requests
+            </h3>
+            <div className="flex flex-col gap-3">
+              {pendingRequests.map((req) => (
+                <div key={req.id} className="flex items-center justify-between bg-amber-50 rounded-lg p-2.5 border border-amber-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-amber-200 text-amber-700 flex items-center justify-center font-bold text-sm">
+                      {req.username[0]?.toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">
+                        {req.username}
+                      </p>
+                      <p className="text-[11px] text-amber-600">Requests access</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleReject(req.id)}
+                      className="px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-200 rounded-md transition-colors"
+                    >
+                      Reject
+                    </button>
+                    <button
+                      onClick={() => handleApprove(req.id, req.username)}
+                      className="px-3 py-1.5 text-xs font-medium bg-amber-500 hover:bg-amber-600 text-white rounded-md transition-colors shadow-sm"
+                    >
+                      Approve
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="mb-6">
-          <h3 className="text-[13px] font-medium text-slate-700 mb-3">
+          <h3 className="text-[13px] font-medium text-slate-700 mb-3 uppercase tracking-wider">
             People with access
           </h3>
 

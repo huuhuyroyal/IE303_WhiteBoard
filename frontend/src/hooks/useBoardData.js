@@ -3,7 +3,7 @@ import html2canvas from 'html2canvas';
 
 const BASE = 'http://localhost:5000';
 
-export default function useBoardData({ boardId, boardTitle, authHeaders, setBoardTitle }) {
+export default function useBoardData({ boardId, boardTitle, authHeaders, setBoardTitle, navigate }) {
   const BOARD_API = `${BASE}/api/board/${boardId}`;
   const timeoutRef = useRef(null);
 
@@ -11,12 +11,22 @@ export default function useBoardData({ boardId, boardTitle, authHeaders, setBoar
     if (!boardId) return;
 
     fetch(`${BOARD_API}`, { headers: authHeaders() })
-      .then((res) => res.ok ? res.json() : null)
+      .then((res) => {
+        if (res.status === 401) {
+          if (navigate) navigate('/');
+          return null;
+        }
+        if (res.status === 403) {
+          if (navigate) navigate(`/request-access/${boardId}`);
+          return null;
+        }
+        return res.ok ? res.json() : null;
+      })
       .then((data) => {
         if (data?.title) setBoardTitle(data.title);
       })
       .catch(() => {});
-  }, [BOARD_API, authHeaders, boardId, setBoardTitle]);
+  }, [BOARD_API, authHeaders, boardId, setBoardTitle, navigate]);
 
   const saveThumbnail = () => {
     const boardElement = document.getElementById('board-container');

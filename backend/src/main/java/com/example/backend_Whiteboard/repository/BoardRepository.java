@@ -11,4 +11,7 @@ public interface BoardRepository extends JpaRepository<Board, UUID> {
 
     @org.springframework.data.jpa.repository.Query("SELECT DISTINCT b FROM Board b LEFT JOIN BoardMember bm ON bm.board = b WHERE b.owner.id = :userId OR bm.user.id = :userId ORDER BY b.createdAt DESC")
     List<Board> findAccessibleBoardsByUserId(@org.springframework.data.repository.query.Param("userId") UUID userId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(b) > 0 FROM Board b LEFT JOIN BoardMember bm ON bm.board = b WHERE b.id = :boardId AND (b.owner.id = :userId OR bm.user.id = :userId)")
+    boolean hasAccessToBoard(@org.springframework.data.repository.query.Param("boardId") UUID boardId, @org.springframework.data.repository.query.Param("userId") UUID userId);
 }
