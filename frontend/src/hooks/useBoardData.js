@@ -1,15 +1,17 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import html2canvas from 'html2canvas';
 
 const BASE = 'http://localhost:5000';
 
-export default function useBoardData({ boardId, boardTitle, authHeaders, setBoardTitle, navigate }) {
+export default function useBoardData({ boardId, boardTitle, authHeaders, setBoardTitle, navigate, user }) {
   const BOARD_API = `${BASE}/api/board/${boardId}`;
   const timeoutRef = useRef(null);
+  const [userRole, setUserRole] = useState("VIEWER"); // Default to VIEWER for safety
 
   useEffect(() => {
     if (!boardId) return;
 
+    // Fetch board info
     fetch(`${BOARD_API}`, { headers: authHeaders() })
       .then((res) => {
         if (res.status === 401) {
@@ -26,7 +28,25 @@ export default function useBoardData({ boardId, boardTitle, authHeaders, setBoar
         if (data?.title) setBoardTitle(data.title);
       })
       .catch(() => {});
-  }, [BOARD_API, authHeaders, boardId, setBoardTitle, navigate]);
+      
+    // Fetch user role
+    if (user?.username) {
+      fetch(`${BOARD_API}/members`, { headers: authHeaders() })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data) {
+            if (data.owner === user.username) {
+              setUserRole("OWNER");
+            } else {
+              const member = data.members?.find(m => m.username === user.username);
+              if (member) {
+                setUserRole(member.role);
+              }
+            }
+          }
+        }).catch(() => {});
+    }
+  }, [BOARD_API, authHeaders, boardId, setBoardTitle, navigate, user?.username]);
 
   const saveThumbnail = () => {
     const boardElement = document.getElementById('board-container');
@@ -82,12 +102,12 @@ export default function useBoardData({ boardId, boardTitle, authHeaders, setBoar
     }
   };
 
-  const submitShare = async (username, setError) => {
+  const submitShare = async (username, role, setError) => {
     try {
       const res = await fetch(`${BASE}/api/board/${boardId}/share`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({ username, role }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -102,5 +122,5 @@ export default function useBoardData({ boardId, boardTitle, authHeaders, setBoar
     }
   };
 
-  return { saveThumbnail, scheduleThumbnailSave, updateTitle, handleExport, submitShare };
+  return { saveThumbnail, scheduleThumbnailSave, updateTitle, handleExport, submitShare, userRole };
 }

@@ -25,11 +25,21 @@ public class BoardMember {
     @Column(name = "joined_at", columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     private LocalDateTime joinedAt = LocalDateTime.now();
 
+    @Column(name = "role", length = 20, columnDefinition = "VARCHAR(20) DEFAULT 'EDITOR'")
+    private String role = "EDITOR"; // Default to EDITOR for backward compatibility
+
     public BoardMember() {}
 
     public BoardMember(Board board, User user) {
         this.board = board;
         this.user = user;
+        this.role = "EDITOR";
+    }
+    
+    public BoardMember(Board board, User user, String role) {
+        this.board = board;
+        this.user = user;
+        this.role = role != null ? role : "EDITOR";
     }
 
     // Getters and Setters
@@ -41,4 +51,6 @@ public class BoardMember {
     public void setUser(User user) { this.user = user; }
     public LocalDateTime getJoinedAt() { return joinedAt; }
     public void setJoinedAt(LocalDateTime joinedAt) { this.joinedAt = joinedAt; }
+    public String getRole() { return role; }
+    public void setRole(String role) { this.role = role; }
 }

@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { Trash2, Copy } from "lucide-react";
 
 import Toolbar from "../components/Toolbar";
-import ShapeEditPanel from "../components/ShapeEditPanel";
+import EditPanel from "../components/EditPanel";
 import ShareModal from "../components/ShareModal";
 import ZoomControls from "../components/ZoomControls";
 import BoardTopBar from "../components/BoardTopBar";
@@ -18,6 +18,7 @@ import Drawing, { useDrawingFeature } from "../features/Drawing";
 import Note, { useNoteFeature } from "../features/Note";
 import AISuggestionBar, { useAISuggestion } from "../features/AISuggestion";
 import BoardTimer from "../features/BoardTimer";
+import AiChatPanel from "../components/AiChatPanel";
 
 export default function CanvasBoard({ boardName }) {
   const { boardId } = useParams();
@@ -35,6 +36,9 @@ export default function CanvasBoard({ boardName }) {
   const [isInteracting, setIsInteracting] = useState(false);
   const [isShapeLibraryOpen, setIsShapeLibraryOpen] = useState(false);
 
+  const [otherCursors, setOtherCursors] = useState({});
+  const lastPublishRef = useRef(0);
+
   const authHeaders = useCallback(
     () => ({
       "Content-Type": "application/json",
@@ -44,15 +48,17 @@ export default function CanvasBoard({ boardName }) {
   );
 
   const socket = useBoardSocket();
+  const { clientRef, connected } = socket;
   const scheduleThumbnailSaveRef = useRef(null);
 
-  const { scheduleThumbnailSave, updateTitle, handleExport, submitShare } =
+  const { scheduleThumbnailSave, updateTitle, handleExport, submitShare, userRole } =
     useBoardData({
       boardId,
       boardTitle,
       authHeaders,
       setBoardTitle,
       navigate,
+      user,
     });
 
   useEffect(() => {
@@ -135,6 +141,13 @@ export default function CanvasBoard({ boardName }) {
   }, [handleGroup, handleUngroup]);
 
   const wrappedPointerDown = (event) => {
+    if (userRole === "VIEWER") {
+      // Allow panning with middle/right button
+      if (event.button === 1 || event.button === 2) {
+        drawing.handlePointerDown(event, setCamera);
+      }
+      return;
+    }
     if (tool === "note") {
       const x = (event.clientX - camera.x) / camera.zoom;
       const y = (event.clientY - camera.y) / camera.zoom;
@@ -145,8 +158,22 @@ export default function CanvasBoard({ boardName }) {
     drawing.handlePointerDown(event, setCamera);
   };
 
-  const wrappedPointerMove = (event) =>
+  const wrappedPointerMove = (event) => {
     drawing.handlePointerMove(event, setCamera);
+    
+    if (connected && clientRef.current) {
+      const now = Date.now();
+      if (now - lastPublishRef.current > 50) { // 50ms throttle
+        const x = (event.clientX - camera.x) / camera.zoom;
+        const y = (event.clientY - camera.y) / camera.zoom;
+        clientRef.current.publish({
+          destination: `/app/board/${boardId}/cursor`,
+          body: JSON.stringify({ username: user?.username, x, y })
+        });
+        lastPublishRef.current = now;
+      }
+    }
+  };
 
   const handleTitleUpdate = () => {
     setIsEditingTitle(false);
@@ -161,6 +188,26 @@ export default function CanvasBoard({ boardName }) {
       drawing.replaceElementWithSuggestion(option, triggerElementIds);
     aiSuggestion.clearSuggestion(true);
   };
+  useEffect(() => {
+  if (connected && clientRef.current) {
+    // Lắng nghe sự kiện di chuột từ người khác
+    const cursorSub = clientRef.current.subscribe(`/topic/board/${boardId}/cursor`, (message) => {
+      const data = JSON.parse(message.body);
+      
+      // Bỏ qua nếu nhận lại chính con trỏ của mình
+      if (data.username === user?.username) return;
+      // Cập nhật toạ độ của người dùng đó vào state
+      setOtherCursors((prev) => ({
+        ...prev,
+        [data.username]: { x: data.x, y: data.y }
+      }));
+    });
+    return () => {
+      cursorSub.unsubscribe();
+    };
+  }
+}, [connected, boardId, user?.username]);
+  
 
   return (
     <div className="h-screen w-screen bg-slate-50 relative overflow-hidden flex items-center justify-center">
@@ -170,15 +217,17 @@ export default function CanvasBoard({ boardName }) {
         onSelect={handleAISelect}
         onClose={() => aiSuggestion.clearSuggestion(true)}
       />
-      <Toolbar
-        tool={tool}
-        setTool={setTool}
-        color={color}
-        setColor={setColor}
-        strokeWidth={strokeWidth}
-        setStrokeWidth={setStrokeWidth}
-        onOpenShapeLibrary={() => setIsShapeLibraryOpen(true)}
-      />
+      {userRole !== "VIEWER" && (
+        <Toolbar
+          tool={tool}
+          setTool={setTool}
+          color={color}
+          setColor={setColor}
+          strokeWidth={strokeWidth}
+          setStrokeWidth={setStrokeWidth}
+          onOpenShapeLibrary={() => setIsShapeLibraryOpen(true)}
+        />
+      )}
       {isShapeLibraryOpen && (
         <ShapeLibraryPanel
           activeTool={tool}
@@ -196,6 +245,7 @@ export default function CanvasBoard({ boardName }) {
         handleBack={handleBack}
         handleTitleUpdate={handleTitleUpdate}
         className={floatingTopClass}
+        readOnly={userRole === "VIEWER"}
       />
 
       <div
@@ -210,12 +260,14 @@ export default function CanvasBoard({ boardName }) {
           >
             Export
           </button>
-          <button
-            onClick={() => setShowShareModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors border border-blue-700 shadow-sm"
-          >
-            Share
-          </button>
+          {userRole !== "VIEWER" && (
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors border border-blue-700 shadow-sm"
+            >
+              Share
+            </button>
+          )}
         </div>
       </div>
 
@@ -233,6 +285,7 @@ export default function CanvasBoard({ boardName }) {
           camera={camera}
           updateNote={note.updateNote}
           deleteNote={note.deleteNote}
+          readOnly={userRole === "VIEWER"}
         />
 
         <Drawing
@@ -267,7 +320,7 @@ export default function CanvasBoard({ boardName }) {
                 isInteracting ? 'opacity-0 scale-95 translate-y-2 pointer-events-none' : 'opacity-100 scale-100 translate-y-0'
               }`}
             >
-              <ShapeEditPanel
+              <EditPanel
                 element={selectedElement}
                 onUpdate={(id, updates) => {
                   if (id === 'group') {
@@ -301,6 +354,33 @@ export default function CanvasBoard({ boardName }) {
       )}
 
       <ZoomControls camera={camera} setCamera={setCamera} />
+      <div 
+        className="absolute inset-0 pointer-events-none z-50"
+        style={{
+          transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
+          transformOrigin: '0 0'
+        }}
+      >
+        {Object.entries(otherCursors).map(([username, pos]) => (
+          <div 
+            key={username}
+            className="absolute flex items-center gap-1 transition-all duration-100 ease-linear"
+            style={{ left: pos.x, top: pos.y }}
+          >
+            {/* Icon con trỏ chuột */}
+            <svg width="18" height="24" viewBox="0 0 18 24" fill="none">
+              <path d="M2.5 2.5L16.5 9.5L9.5 12.5L13.5 21.5L9.5 23.5L5.5 14.5L1.5 17.5V2.5Z" fill="#3B82F6" stroke="white" strokeWidth="2" strokeLinejoin="round"/>
+            </svg>
+            {/* Nhãn tên người dùng */}
+            <span className="bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded shadow">
+              {username}
+            </span>
+          </div>
+        ))}
+      </div>
+      
+      <AiChatPanel boardId={boardId} authHeaders={authHeaders} />
     </div>
+    
   );
 }

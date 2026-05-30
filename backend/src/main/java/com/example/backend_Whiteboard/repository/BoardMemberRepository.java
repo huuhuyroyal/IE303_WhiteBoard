@@ -8,4 +8,5 @@ import java.util.List;
 
 public interface BoardMemberRepository extends JpaRepository<BoardMember, UUID> {
     List<BoardMember> findByBoardId(UUID boardId);
+    java.util.Optional<BoardMember> findByBoardIdAndUserId(UUID boardId, UUID userId);
 }
