@@ -1,6 +1,6 @@
 import StickyNote from './StickyNote';
 
-export default function StickyNotesLayer({ notes, camera, handleNoteUpdate, handleNoteDelete }) {
+export default function StickyNotesLayer({ notes, camera, handleNoteUpdate, handleNoteDelete, readOnly }) {
   return (
     <div 
       className="absolute inset-0 pointer-events-none"
@@ -16,6 +16,7 @@ export default function StickyNotesLayer({ notes, camera, handleNoteUpdate, hand
             onUpdate={handleNoteUpdate}
             onDelete={handleNoteDelete}
             cameraZoom={camera.zoom}
+            readOnly={readOnly}
           />
         </div>
       ))}

@@ -180,7 +180,7 @@ export function useDrawingFeature({
       metadata: {
         ...(element.metadata || {}),
         type: element.type,
-        tool: element.metadata?.tool || element.type,
+        tool: element.type === 'path' ? 'pencil' : element.type === 'highlight' ? 'highlighter' : (element.metadata?.tool || element.type),
       },
     };
 
@@ -246,12 +246,21 @@ export function useDrawingFeature({
       if (selectedIdsRef.current.length === 1) {
         const activeId = selectedIdsRef.current[0];
         const target = elementsRef.current.find(e => e.id === activeId);
-        if (target && (isShapeTool(target.type) || target.type === 'ai-svg')) {
-          const p1 = target.points[0];
-          const p2 = target.points[target.points.length - 1];
+        const _isPen = target && (target.type === 'path' || target.type === 'highlight');
+        if (target && (isShapeTool(target.type) || target.type === 'ai-svg' || _isPen)) {
+          let p1, p2;
+          if (_isPen) {
+            const xs = target.points.map(p => p.x);
+            const ys = target.points.map(p => p.y);
+            p1 = { x: Math.min(...xs), y: Math.min(...ys) };
+            p2 = { x: Math.max(...xs), y: Math.max(...ys) };
+          } else {
+            p1 = target.points[0];
+            p2 = target.points[target.points.length - 1];
+          }
           const handleSize = 15 / camera.zoom;
 
-          if (target.type === 'line' || target.type === 'arrow') {
+          if (!_isPen && (target.type === 'line' || target.type === 'arrow')) {
              if (Math.hypot(x - p1.x, y - p1.y) <= handleSize) resizeModeRef.current = 'start';
              else if (Math.hypot(x - p2.x, y - p2.y) <= handleSize) resizeModeRef.current = 'end';
           } else {
@@ -308,7 +317,7 @@ export function useDrawingFeature({
           }
       }
 
-      if (groupClicked || (target && (isShapeTool(target.type) || target.type === 'ai-svg'))) {
+      if (groupClicked || (target && (isShapeTool(target.type) || target.type === 'ai-svg' || target.type === 'path' || target.type === 'highlight'))) {
         resizeModeRef.current = null;
         isDraggingShapeRef.current = true;
         hasMovedRef.current = false;
@@ -417,6 +426,37 @@ export function useDrawingFeature({
         
         const activeId = selectedIdsRef.current[0];
         const original = originalPointsRef.current[0];
+
+        // Pen strokes: scale all points proportionally inside bounding box
+        const _penTarget = elementsRef.current.find(e => e.id === activeId);
+        if (_penTarget && (_penTarget.type === 'path' || _penTarget.type === 'highlight')) {
+          const xs = original.points.map(p => p.x);
+          const ys = original.points.map(p => p.y);
+          const origXMin = Math.min(...xs), origYMin = Math.min(...ys);
+          const origXMax = Math.max(...xs), origYMax = Math.max(...ys);
+          const origW = origXMax - origXMin || 1;
+          const origH = origYMax - origYMin || 1;
+          let nXMin = origXMin, nYMin = origYMin, nXMax = origXMax, nYMax = origYMax;
+          const mode = resizeModeRef.current;
+          if (mode.includes('l')) nXMin = origXMin + dx;
+          if (mode.includes('r')) nXMax = origXMax + dx;
+          if (mode.includes('t')) nYMin = origYMin + dy;
+          if (mode.includes('b')) nYMax = origYMax + dy;
+          const nW = nXMax - nXMin || 1;
+          const nH = nYMax - nYMin || 1;
+          const scaledPts = original.points.map(p => ({
+            x: nXMin + (p.x - origXMin) * (nW / origW),
+            y: nYMin + (p.y - origYMin) * (nH / origH),
+          }));
+          setElements(prev => {
+            const next = prev.map(item => item.id === activeId ? { ...item, points: scaledPts } : item);
+            elementsRef.current = next;
+            return next;
+          });
+          bumpPreview();
+          return;
+        }
+
         const p1 = original.points[0];
         const p2 = original.points[original.points.length - 1];
         let xMin = Math.min(p1.x, p2.x);
@@ -576,12 +616,21 @@ export function useDrawingFeature({
       if (!isDraggingShapeRef.current && !resizeModeRef.current && selectedIdsRef.current.length === 1) {
         const activeId = selectedIdsRef.current[0];
         const target = elementsRef.current.find(e => e.id === activeId);
-        if (target && (isShapeTool(target.type) || target.type === 'ai-svg')) {
-          const p1 = target.points[0];
-          const p2 = target.points[target.points.length - 1];
+        const _isHoverPen = target && (target.type === 'path' || target.type === 'highlight');
+        if (target && (isShapeTool(target.type) || target.type === 'ai-svg' || _isHoverPen)) {
+          let p1, p2;
+          if (_isHoverPen) {
+            const xs = target.points.map(p => p.x);
+            const ys = target.points.map(p => p.y);
+            p1 = { x: Math.min(...xs), y: Math.min(...ys) };
+            p2 = { x: Math.max(...xs), y: Math.max(...ys) };
+          } else {
+            p1 = target.points[0];
+            p2 = target.points[target.points.length - 1];
+          }
           const handleSize = 15 / camera.zoom;
 
-          if (target.type === 'line' || target.type === 'arrow') {
+          if (!_isHoverPen && (target.type === 'line' || target.type === 'arrow')) {
              if (Math.hypot(x - p1.x, y - p1.y) <= handleSize) hoverCursor = 'crosshair';
              else if (Math.hypot(x - p2.x, y - p2.y) <= handleSize) hoverCursor = 'crosshair';
           } else {
@@ -612,11 +661,10 @@ export function useDrawingFeature({
         }
       }
       if (hoverCursor === 'default' && selectedIdsRef.current.length > 0) {
-        // Only show 'move' cursor if we are actually hovering over the group or an element
         const isGroupHovered = () => {
           if (selectedIdsRef.current.length === 1) {
-            const target = findElementAtPoint(x, y);
-            return target && target.id === selectedIdsRef.current[0];
+            const hTarget = findElementAtPoint(x, y);
+            return hTarget && hTarget.id === selectedIdsRef.current[0];
           } else {
             const selectedElements = elementsRef.current.filter(e => selectedIdsRef.current.includes(e.id));
             let xMin = Infinity, yMin = Infinity, xMax = -Infinity, yMax = -Infinity;

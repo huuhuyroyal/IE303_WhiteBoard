@@ -9,6 +9,7 @@ export default function BoardTopBar({
   handleBack,
   handleTitleUpdate,
   className = '',
+  readOnly = false,
 }) {
   const titleInputRef = useRef(null);
 
@@ -36,9 +37,9 @@ export default function BoardTopBar({
         />
       ) : (
         <h1
-          className="font-bold text-slate-800 text-sm cursor-pointer hover:text-blue-600 transition-colors"
-          title="Click to rename"
-          onClick={() => setIsEditingTitle(true)}
+          className={`font-bold text-slate-800 text-sm ${readOnly ? '' : 'cursor-pointer hover:text-blue-600 transition-colors'}`}
+          title={readOnly ? '' : 'Click to rename'}
+          onClick={() => { if (!readOnly) setIsEditingTitle(true); }}
         >
           {boardTitle}
         </h1>

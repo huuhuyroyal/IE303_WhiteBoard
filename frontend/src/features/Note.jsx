@@ -105,13 +105,14 @@ export function useNoteFeature({ boardId, authHeaders, socket, onBoardChanged })
   };
 }
 
-export default function Note({ notes, camera, updateNote, deleteNote }) {
+export default function Note({ notes, camera, updateNote, deleteNote, readOnly }) {
   return (
     <StickyNotesLayer
       notes={notes}
       camera={camera}
       handleNoteUpdate={updateNote}
       handleNoteDelete={deleteNote}
+      readOnly={readOnly}
     />
   );
 }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { 
   Square, Circle, Triangle, Diamond, Minus, ArrowRight, Star, Hexagon,
   ChevronDown, Trash2, Copy, Menu, Ban, SquareDashed, PaintBucket, 
-  Minus as SolidLine, Ellipsis as DashedLine, Layers
+  Minus as SolidLine, Ellipsis as DashedLine, Layers, PenLine, Highlighter
 } from 'lucide-react';
 
 const SHAPES = [
@@ -23,10 +23,17 @@ const COLORS = [
   '#86efac', '#6ee7b7', '#93c5fd', '#c4b5fd', '#f0abfc'
 ];
 
-export default function ShapeEditPanel({ element, onUpdate, onDuplicate, onDelete, onGroup, onUngroup }) {
-  const [activeMenu, setActiveMenu] = useState(null); // 'shape', 'fill', 'stroke', 'options'
+export default function EditPanel({ element, onUpdate, onDuplicate, onDelete, onGroup, onUngroup }) {
+  const [activeMenu, setActiveMenu] = useState(null);
 
-  if (!element || (!SHAPES.find(s => s.type === element.type) && element.type !== 'ai-svg' && element.type !== 'group')) {
+  const isPenElement = element?.type === 'path' || element?.type === 'highlight';
+
+  if (!element || (
+    !SHAPES.find(s => s.type === element.type) &&
+    element.type !== 'ai-svg' &&
+    element.type !== 'group' &&
+    !isPenElement
+  )) {
     return null;
   }
 
@@ -210,6 +217,31 @@ export default function ShapeEditPanel({ element, onUpdate, onDuplicate, onDelet
             )}
             <div className="w-px h-6 bg-slate-700 mx-1"></div>
           </>
+        ) : isPenElement ? (
+          /* Pen / Highlight toggle */
+          <>
+            <div className="flex items-center gap-1 p-1">
+              <button
+                onClick={() => onUpdate(element.id, { type: 'path', width: element.type === 'highlight' ? 4 : element.width })}
+                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  element.type === 'path' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-700'
+                }`}
+                title="Pen stroke"
+              >
+                <PenLine size={13} /> Pen
+              </button>
+              <button
+                onClick={() => onUpdate(element.id, { type: 'highlight', width: element.type === 'path' ? 20 : element.width })}
+                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  element.type === 'highlight' ? 'bg-yellow-400/90 text-slate-900' : 'text-slate-400 hover:bg-slate-700'
+                }`}
+                title="Highlight stroke"
+              >
+                <Highlighter size={13} /> Highlight
+              </button>
+            </div>
+            <div className="w-px h-6 bg-slate-700 mx-1"></div>
+          </>
         ) : (
           <>
             {/* Shape Button */}
@@ -226,7 +258,7 @@ export default function ShapeEditPanel({ element, onUpdate, onDuplicate, onDelet
           </>
         )}
 
-        {/* Fill Color Button */}
+        {/* Color Button — works for both pen and shapes */}
         <button
           onClick={() => toggleMenu('fill')}
           className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${
@@ -248,18 +280,32 @@ export default function ShapeEditPanel({ element, onUpdate, onDuplicate, onDelet
 
         <div className="w-px h-6 bg-slate-700 mx-1"></div>
 
-        {/* Stroke Style Button */}
-        <button
-          onClick={() => toggleMenu('stroke')}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${
-            activeMenu === 'stroke' ? 'bg-slate-700' : 'hover:bg-slate-800'
-          }`}
-        >
-          {strokeStyle === 'solid' ? <SolidLine size={16} className="text-slate-300" /> : 
-           strokeStyle === 'dashed' ? <DashedLine size={16} className="text-slate-300" /> : 
-           <Ban size={16} className="text-slate-300" />}
-          <ChevronDown size={14} className="text-slate-500" />
-        </button>
+        {isPenElement ? (
+          /* Pen: width slider instead of stroke style */
+          <div className="flex items-center gap-2 px-2">
+            <span className="text-xs text-slate-400">W</span>
+            <input
+              type="range" min="1" max="40"
+              value={element.width || 4}
+              onChange={(e) => onUpdate(element.id, { width: Number(e.target.value) })}
+              className="w-20 accent-blue-500 cursor-pointer"
+            />
+            <span className="text-xs text-slate-400 w-5">{element.width || 4}</span>
+          </div>
+        ) : (
+          /* Shapes: stroke style selector */
+          <button
+            onClick={() => toggleMenu('stroke')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${
+              activeMenu === 'stroke' ? 'bg-slate-700' : 'hover:bg-slate-800'
+            }`}
+          >
+            {strokeStyle === 'solid' ? <SolidLine size={16} className="text-slate-300" /> : 
+             strokeStyle === 'dashed' ? <DashedLine size={16} className="text-slate-300" /> : 
+             <Ban size={16} className="text-slate-300" />}
+            <ChevronDown size={14} className="text-slate-500" />
+          </button>
+        )}
 
         <div className="w-px h-6 bg-slate-700 mx-1"></div>
 
