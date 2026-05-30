@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard';
 import CanvasBoard from './pages/CanvasBoard';
 import Login from './pages/Login';
 import RequestAccess from './pages/RequestAccess';
+import Profile from './pages/Profile';
 
 // Protected route wrapper
 function ProtectedRoute({ children }) {
@@ -43,6 +44,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <RequestAccess />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <Profile />
           </ProtectedRoute>
         }
       />
