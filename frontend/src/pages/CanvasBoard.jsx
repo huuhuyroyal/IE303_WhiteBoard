@@ -9,6 +9,7 @@ import ShapeEditPanel from "../components/ShapeEditPanel";
 import ShareModal from "../components/ShareModal";
 import ZoomControls from "../components/ZoomControls";
 import BoardTopBar from "../components/BoardTopBar";
+import ShapeLibraryPanel from "../components/ShapeLibraryPanel";
 
 import useBoardSocket from "../hooks/useBoardSocket";
 import useBoardData from "../hooks/useBoardData";
@@ -32,6 +33,7 @@ export default function CanvasBoard({ boardName }) {
   const [showShareModal, setShowShareModal] = useState(false);
   const [selectedElement, setSelectedElement] = useState(null);
   const [isInteracting, setIsInteracting] = useState(false);
+  const [isShapeLibraryOpen, setIsShapeLibraryOpen] = useState(false);
 
   const authHeaders = useCallback(
     () => ({
@@ -174,7 +176,16 @@ export default function CanvasBoard({ boardName }) {
         setColor={setColor}
         strokeWidth={strokeWidth}
         setStrokeWidth={setStrokeWidth}
+        onOpenShapeLibrary={() => setIsShapeLibraryOpen(true)}
       />
+      {isShapeLibraryOpen && (
+        <ShapeLibraryPanel
+          activeTool={tool}
+          setTool={setTool}
+          onClose={() => setIsShapeLibraryOpen(false)}
+        />
+      )}
+
 
       <BoardTopBar
         boardTitle={boardTitle}

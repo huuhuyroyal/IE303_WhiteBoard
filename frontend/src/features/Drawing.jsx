@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { SHAPE_TOOLS, distanceToSegment, drawShapeElement, isPointInShapeElement, isShapeTool } from './Shape';
+import { SHAPE_TOOLS, drawShapeElement, isPointInShapeElement, isShapeTool, getClosestPointOnShapePerimeter, getShapeAnchors, distanceToSegment } from './Shape';
 
 const BASE = 'http://localhost:5000';
 const CURSORS = {
@@ -31,6 +31,7 @@ export function useDrawingFeature({
   const linePreviewRef = useRef(null);
   const shapePreviewRef = useRef(null);
   const isPanningRef = useRef(false);
+  const isClickDrawingRef = useRef(false);
   const lastPanPointRef = useRef({ x: 0, y: 0 });
   const selectedIdsRef = useRef([]);
   const resizeModeRef = useRef(null);
@@ -41,6 +42,7 @@ export function useDrawingFeature({
   const originalPointsRef = useRef(null);
   const selectionBoxRef = useRef(null);
   const undoStackRef = useRef([]);
+  const snappingShapeRef = useRef(null);
 
   const [elements, setElements] = useState([]);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -247,29 +249,40 @@ export function useDrawingFeature({
         if (target && (isShapeTool(target.type) || target.type === 'ai-svg')) {
           const p1 = target.points[0];
           const p2 = target.points[target.points.length - 1];
-          const xMin = Math.min(p1.x, p2.x);
-          const yMin = Math.min(p1.y, p2.y);
-          const xMax = Math.max(p1.x, p2.x);
-          const yMax = Math.max(p1.y, p2.y);
-          const w = xMax - xMin;
-          const h = yMax - yMin;
           const handleSize = 15 / camera.zoom;
 
-          const handles = {
-            'tl': [xMin, yMin], 'tc': [xMin + w/2, yMin], 'tr': [xMax, yMin],
-            'ml': [xMin, yMin + h/2],                     'mr': [xMax, yMin + h/2],
-            'bl': [xMin, yMax], 'bc': [xMin + w/2, yMax], 'br': [xMax, yMax]
-          };
+          if (target.type === 'line' || target.type === 'arrow') {
+             if (Math.hypot(x - p1.x, y - p1.y) <= handleSize) resizeModeRef.current = 'start';
+             else if (Math.hypot(x - p2.x, y - p2.y) <= handleSize) resizeModeRef.current = 'end';
+          } else {
+             const xMin = Math.min(p1.x, p2.x);
+             const yMin = Math.min(p1.y, p2.y);
+             const xMax = Math.max(p1.x, p2.x);
+             const yMax = Math.max(p1.y, p2.y);
+             
+             const edgeThreshold = 10 / camera.zoom;
+             
+             if (Math.hypot(x - xMin, y - yMin) <= edgeThreshold) resizeModeRef.current = 'tl';
+             else if (Math.hypot(x - xMax, y - yMin) <= edgeThreshold) resizeModeRef.current = 'tr';
+             else if (Math.hypot(x - xMin, y - yMax) <= edgeThreshold) resizeModeRef.current = 'bl';
+             else if (Math.hypot(x - xMax, y - yMax) <= edgeThreshold) resizeModeRef.current = 'br';
+             else if (Math.abs(x - xMin) <= edgeThreshold && y >= yMin && y <= yMax) resizeModeRef.current = 'ml';
+             else if (Math.abs(x - xMax) <= edgeThreshold && y >= yMin && y <= yMax) resizeModeRef.current = 'mr';
+             else if (Math.abs(y - yMin) <= edgeThreshold && x >= xMin && x <= xMax) resizeModeRef.current = 'tc';
+             else if (Math.abs(y - yMax) <= edgeThreshold && x >= xMin && x <= xMax) resizeModeRef.current = 'bc';
+          }
 
-          for (const [key, [hx, hy]] of Object.entries(handles)) {
-            if (Math.hypot(x - hx, y - hy) <= handleSize) {
-              resizeModeRef.current = key;
-              isDraggingShapeRef.current = false;
-              dragStartPosRef.current = { x, y };
-              originalPointsRef.current = [{ id: target.id, points: JSON.parse(JSON.stringify(target.points)) }];
-              hasMovedRef.current = false;
-              return;
-            }
+          if (resizeModeRef.current) {
+            isDraggingShapeRef.current = false;
+            dragStartPosRef.current = { x, y };
+            originalPointsRef.current = [{ 
+              id: target.id, 
+              points: JSON.parse(JSON.stringify(target.points)),
+              startConnectedTo: target.metadata?.startConnectedTo,
+              endConnectedTo: target.metadata?.endConnectedTo
+            }];
+            hasMovedRef.current = false;
+            return;
           }
         }
       }
@@ -311,9 +324,20 @@ export function useDrawingFeature({
         }
         
         dragStartPosRef.current = { x, y };
-        originalPointsRef.current = elementsRef.current
-          .filter(e => selectedIdsRef.current.includes(e.id))
-          .map(e => ({ id: e.id, points: JSON.parse(JSON.stringify(e.points)) }));
+        
+        const selected = elementsRef.current.filter(e => selectedIdsRef.current.includes(e.id));
+        const connectedLines = elementsRef.current.filter(e => 
+          (e.type === 'line' || e.type === 'arrow') && 
+          (selectedIdsRef.current.includes(e.metadata?.startConnectedTo) || selectedIdsRef.current.includes(e.metadata?.endConnectedTo))
+        );
+        const uniqueElements = Array.from(new Set([...selected, ...connectedLines]));
+        
+        originalPointsRef.current = uniqueElements.map(e => ({ 
+          id: e.id, 
+          points: JSON.parse(JSON.stringify(e.points)),
+          startConnectedTo: e.metadata?.startConnectedTo,
+          endConnectedTo: e.metadata?.endConnectedTo
+        }));
           
         setSelectedIds([...selectedIdsRef.current]);
         updateSelectedElementCallback();
@@ -346,16 +370,11 @@ export function useDrawingFeature({
       return;
     }
 
-    if (tool === 'line') {
+    if (isShapeTool(tool) || tool === 'ai-svg') {
       setIsDrawing(true);
-      linePreviewRef.current = { startX: x, startY: y, endX: x, endY: y };
-      bumpPreview();
-      return;
-    }
-
-    if (SHAPE_TOOLS.includes(tool)) {
-      setIsDrawing(true);
-      shapePreviewRef.current = { startX: x, startY: y, endX: x, endY: y };
+      if (!isClickDrawingRef.current) {
+        shapePreviewRef.current = { startX: x, startY: y, endX: x, endY: y };
+      }
       bumpPreview();
     }
   };
@@ -406,17 +425,90 @@ export function useDrawingFeature({
         let yMax = Math.max(p1.y, p2.y);
 
         const mode = resizeModeRef.current;
-        if (mode.includes('l')) xMin += dx;
-        if (mode.includes('r')) xMax += dx;
-        if (mode.includes('t')) yMin += dy;
-        if (mode.includes('b')) yMax += dy;
+        let nextP1 = { ...p1 };
+        let nextP2 = { ...p2 };
+        let connectedStart = original.startConnectedTo || null;
+        let connectedEnd = original.endConnectedTo || null;
 
-        const nextP1 = { x: xMin, y: yMin };
-        const nextP2 = { x: xMax, y: yMax };
+        if (mode === 'start' || mode === 'end') {
+          let snapPoint = { x: p1.x + dx, y: p1.y + dy }; // Default to moving start
+          if (mode === 'end') {
+             snapPoint = { x: p2.x + dx, y: p2.y + dy };
+          }
+          let snappedToId = null;
+          let closestShape = null;
+          let closestDistToShape = Infinity;
+
+          for (const el of elementsRef.current) {
+            if (el.id !== activeId && isShapeTool(el.type) && el.type !== 'line' && el.type !== 'arrow') {
+               const elXMin = Math.min(el.points[0].x, el.points[el.points.length - 1].x);
+               const elYMin = Math.min(el.points[0].y, el.points[el.points.length - 1].y);
+               const elXMax = Math.max(el.points[0].x, el.points[el.points.length - 1].x);
+               const elYMax = Math.max(el.points[0].y, el.points[el.points.length - 1].y);
+               
+               if (x >= elXMin - 20 && x <= elXMax + 20 && y >= elYMin - 20 && y <= elYMax + 20) {
+                  const cx = (elXMin + elXMax) / 2;
+                  const cy = (elYMin + elYMax) / 2;
+                  const dist = Math.hypot(x - cx, y - cy);
+                  if (dist < closestDistToShape) {
+                      closestDistToShape = dist;
+                      closestShape = { el, elXMin, elYMin, elXMax, elYMax, cx, cy };
+                  }
+               }
+            }
+          }
+
+          if (closestShape) {
+              const { el, elXMin, elYMin, elXMax, elYMax, cx, cy } = closestShape;
+              snappedToId = el.id;
+              
+              const closestPoint = getClosestPointOnShapePerimeter(x, y, el);
+              let px = closestPoint.x;
+              let py = closestPoint.y;
+              
+              const anchors = getShapeAnchors(el);
+              let snappedToAnchor = false;
+              for (const pt of anchors) {
+                 if (Math.hypot(px - pt.x, py - pt.y) < 15) {
+                    snapPoint = pt;
+                    snappedToAnchor = true;
+                    break;
+                 }
+              }
+              if (!snappedToAnchor) {
+                 snapPoint = { x: px, y: py };
+              }
+          }
+
+          if (snappingShapeRef.current !== snappedToId) {
+             snappingShapeRef.current = snappedToId;
+          }
+
+          if (mode === 'start') {
+            nextP1 = snapPoint;
+            connectedStart = snappedToId;
+            nextP2 = { ...p2 }; // Ensure p2 stays original
+          } else {
+            nextP2 = snapPoint;
+            connectedEnd = snappedToId;
+            nextP1 = { ...p1 }; // Ensure p1 stays original
+          }
+        } else {
+          if (mode.includes('l')) xMin += dx;
+          if (mode.includes('r')) xMax += dx;
+          if (mode.includes('t')) yMin += dy;
+          if (mode.includes('b')) yMax += dy;
+          nextP1 = { x: xMin, y: yMin };
+          nextP2 = { x: xMax, y: yMax };
+        }
 
         setElements((prev) => {
           const next = prev.map((item) => item.id === activeId
-            ? { ...item, points: [nextP1, nextP2] }
+            ? { 
+                ...item, 
+                points: [nextP1, nextP2],
+                metadata: { ...item.metadata, startConnectedTo: connectedStart, endConnectedTo: connectedEnd }
+              }
             : item);
           elementsRef.current = next;
           return next;
@@ -439,13 +531,36 @@ export function useDrawingFeature({
             const next = prev.map((item) => {
               const original = originalPointsRef.current.find(o => o.id === item.id);
               if (original) {
-                return {
-                  ...item,
-                  points: original.points.map((p) => ({
-                    x: p.x + dx,
-                    y: p.y + dy,
-                  })),
-                };
+                // If it's a selected shape, move entirely
+                if (selectedIdsRef.current.includes(item.id)) {
+                  return {
+                    ...item,
+                    points: original.points.map((p) => ({
+                      x: p.x + dx,
+                      y: p.y + dy,
+                    })),
+                  };
+                }
+                
+                // If it's a connected line, move only the connected endpoints
+                if (item.type === 'line' || item.type === 'arrow') {
+                  const startSelected = selectedIdsRef.current.includes(original.startConnectedTo);
+                  const endSelected = selectedIdsRef.current.includes(original.endConnectedTo);
+                  
+                  if (startSelected || endSelected) {
+                    const nextPoints = [...original.points];
+                    if (startSelected) {
+                      nextPoints[0] = { x: nextPoints[0].x + dx, y: nextPoints[0].y + dy };
+                    }
+                    if (endSelected) {
+                      nextPoints[nextPoints.length - 1] = { 
+                        x: nextPoints[nextPoints.length - 1].x + dx, 
+                        y: nextPoints[nextPoints.length - 1].y + dy 
+                      };
+                    }
+                    return { ...item, points: nextPoints };
+                  }
+                }
               }
               return item;
             });
@@ -464,28 +579,35 @@ export function useDrawingFeature({
         if (target && (isShapeTool(target.type) || target.type === 'ai-svg')) {
           const p1 = target.points[0];
           const p2 = target.points[target.points.length - 1];
-          const xMin = Math.min(p1.x, p2.x);
-          const yMin = Math.min(p1.y, p2.y);
-          const xMax = Math.max(p1.x, p2.x);
-          const yMax = Math.max(p1.y, p2.y);
-          const w = xMax - xMin;
-          const h = yMax - yMin;
-          const handleSize = 10 / camera.zoom;
+          const handleSize = 15 / camera.zoom;
 
-          const handles = {
-            'tl': [xMin, yMin], 'tc': [xMin + w/2, yMin], 'tr': [xMax, yMin],
-            'ml': [xMin, yMin + h/2],                     'mr': [xMax, yMin + h/2],
-            'bl': [xMin, yMax], 'bc': [xMin + w/2, yMax], 'br': [xMax, yMax]
-          };
+          if (target.type === 'line' || target.type === 'arrow') {
+             if (Math.hypot(x - p1.x, y - p1.y) <= handleSize) hoverCursor = 'crosshair';
+             else if (Math.hypot(x - p2.x, y - p2.y) <= handleSize) hoverCursor = 'crosshair';
+          } else {
+             const xMin = Math.min(p1.x, p2.x);
+             const yMin = Math.min(p1.y, p2.y);
+             const xMax = Math.max(p1.x, p2.x);
+             const yMax = Math.max(p1.y, p2.y);
+             
+             const edgeThreshold = 10 / camera.zoom;
+             
+             let hitKey = null;
+             if (Math.hypot(x - xMin, y - yMin) <= edgeThreshold) hitKey = 'tl';
+             else if (Math.hypot(x - xMax, y - yMin) <= edgeThreshold) hitKey = 'tr';
+             else if (Math.hypot(x - xMin, y - yMax) <= edgeThreshold) hitKey = 'bl';
+             else if (Math.hypot(x - xMax, y - yMax) <= edgeThreshold) hitKey = 'br';
+             else if (Math.abs(x - xMin) <= edgeThreshold && y >= yMin && y <= yMax) hitKey = 'ml';
+             else if (Math.abs(x - xMax) <= edgeThreshold && y >= yMin && y <= yMax) hitKey = 'mr';
+             else if (Math.abs(y - yMin) <= edgeThreshold && x >= xMin && x <= xMax) hitKey = 'tc';
+             else if (Math.abs(y - yMax) <= edgeThreshold && x >= xMin && x <= xMax) hitKey = 'bc';
 
-          for (const [key, [hx, hy]] of Object.entries(handles)) {
-            if (Math.hypot(x - hx, y - hy) <= handleSize) {
-              if (['tl', 'br'].includes(key)) hoverCursor = 'nwse-resize';
-              else if (['tr', 'bl'].includes(key)) hoverCursor = 'nesw-resize';
-              else if (['tc', 'bc'].includes(key)) hoverCursor = 'ns-resize';
-              else if (['ml', 'mr'].includes(key)) hoverCursor = 'ew-resize';
-              break;
-            }
+             if (hitKey) {
+                if (['tl', 'br'].includes(hitKey)) hoverCursor = 'nwse-resize';
+                else if (['tr', 'bl'].includes(hitKey)) hoverCursor = 'nesw-resize';
+                else if (['tc', 'bc'].includes(hitKey)) hoverCursor = 'ns-resize';
+                else if (['ml', 'mr'].includes(hitKey)) hoverCursor = 'ew-resize';
+             }
           }
         }
       }
@@ -526,13 +648,6 @@ export function useDrawingFeature({
 
     if (tool === 'pencil' || tool === 'highlighter') {
       currentPathRef.current.push({ x, y });
-      bumpPreview();
-      return;
-    }
-
-    if (tool === 'line' && linePreviewRef.current) {
-      linePreviewRef.current.endX = x;
-      linePreviewRef.current.endY = y;
       bumpPreview();
       return;
     }
@@ -680,15 +795,18 @@ export function useDrawingFeature({
 
       resizeModeRef.current = null;
       isDraggingShapeRef.current = false;
+      snappingShapeRef.current = null;
       setCanvasCursor(null);
 
-      if (changed && selectedIdsRef.current.length > 0) {
-        selectedIdsRef.current.forEach(id => {
-          const element = elementsRef.current.find((item) => item.id === id);
-          const original = originalPointsRef.current?.find(o => o.id === id);
-          if (element) {
+      if (changed && originalPointsRef.current) {
+        originalPointsRef.current.forEach(original => {
+          const element = elementsRef.current.find((item) => item.id === original.id);
+          // Simple check to see if points or connection metadata changed
+          if (element && (JSON.stringify(element.points) !== JSON.stringify(original.points) || 
+                          element.metadata?.startConnectedTo !== original.startConnectedTo ||
+                          element.metadata?.endConnectedTo !== original.endConnectedTo)) {
             saveStroke(element, 'PUT');
-            pushToUndo({ type: 'MODIFY', oldElement: original ? { ...element, points: original.points } : element });
+            pushToUndo({ type: 'MODIFY', oldElement: { ...element, points: original.points, metadata: { ...element.metadata, startConnectedTo: original.startConnectedTo, endConnectedTo: original.endConnectedTo } } });
           }
         });
         updateSelectedElementCallback();
@@ -699,9 +817,9 @@ export function useDrawingFeature({
     }
 
     if (!isDrawing) return;
-    setIsDrawing(false);
 
     if ((tool === 'pencil' || tool === 'highlighter') && currentPathRef.current.length > 0) {
+      setIsDrawing(false);
       const next = {
         id: crypto.randomUUID(),
         boardId,
@@ -724,38 +842,29 @@ export function useDrawingFeature({
       return;
     }
 
-    if (tool === 'line' && linePreviewRef.current) {
-      const next = {
-        id: crypto.randomUUID(),
-        boardId,
-        type: 'line',
-        points: [
-          { x: linePreviewRef.current.startX, y: linePreviewRef.current.startY },
-          { x: linePreviewRef.current.endX, y: linePreviewRef.current.endY },
-        ],
-        color,
-        width: strokeWidth,
-        metadata: {},
-      };
-      setElements((prev) => {
-        const all = [...prev, next];
-        elementsRef.current = all;
-        return all;
-      });
-      linePreviewRef.current = null;
-      saveStroke(next, 'POST');
-      pushToUndo({ type: 'ADD', element: next });
-      bumpPreview();
-      return;
-    }
-
     if (isShapeTool(tool) && shapePreviewRef.current) {
       let p1 = { x: shapePreviewRef.current.startX, y: shapePreviewRef.current.startY };
       let p2 = { x: shapePreviewRef.current.endX, y: shapePreviewRef.current.endY };
+      
+      const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
 
-      if (Math.hypot(p2.x - p1.x, p2.y - p1.y) < 5) {
-        p1 = { x: p1.x - 50, y: p1.y - 50 };
-        p2 = { x: p2.x + 50, y: p2.y + 50 };
+      if (!isClickDrawingRef.current && dist < 5) {
+        // Start click-drawing mode
+        isClickDrawingRef.current = true;
+        return; // keep isDrawing = true
+      }
+
+      setIsDrawing(false);
+      isClickDrawingRef.current = false;
+
+      // If they just double clicked without moving, make a default size
+      if (dist < 5) {
+        if (tool === 'line' || tool === 'arrow') {
+           p2 = { x: p1.x + 100, y: p1.y };
+        } else {
+           p1 = { x: p1.x - 50, y: p1.y - 50 };
+           p2 = { x: p2.x + 50, y: p2.y + 50 };
+        }
       }
 
       const next = {
@@ -767,6 +876,8 @@ export function useDrawingFeature({
         width: strokeWidth,
         metadata: {},
       };
+      
+      shapePreviewRef.current = null;
       setElements((prev) => {
         const all = [...prev, next];
         elementsRef.current = all;
@@ -778,8 +889,8 @@ export function useDrawingFeature({
       bumpPreview();
       
       onToolChange?.('select');
-      setSelectedElementId(next.id);
-      selectedElementIdRef.current = next.id;
+      setSelectedIds([next.id]);
+      selectedIdsRef.current = [next.id];
       onElementSelected?.(next);
     }
   };
@@ -861,18 +972,7 @@ export function useDrawingFeature({
       ctx.globalAlpha = 1;
     }
 
-    if (tool === 'line' && linePreviewRef.current) {
-      ctx.lineWidth = strokeWidth;
-      drawShapeElement(ctx, {
-        type: 'line',
-        points: [
-          { x: linePreviewRef.current.startX, y: linePreviewRef.current.startY },
-          { x: linePreviewRef.current.endX, y: linePreviewRef.current.endY },
-        ],
-        color,
-        metadata: { strokeStyle: 'dashed' }
-      });
-    }
+
 
     if (isShapeTool(tool) && shapePreviewRef.current) {
       ctx.lineWidth = strokeWidth;
@@ -885,6 +985,31 @@ export function useDrawingFeature({
         color,
         metadata: { strokeStyle: 'dashed' }
       });
+    }
+
+    if (snappingShapeRef.current) {
+      const shape = elementsRef.current.find(e => e.id === snappingShapeRef.current);
+      if (shape) {
+         const highlightShape = {
+            ...shape,
+            color: 'transparent',
+            width: ((shape.width || 4) + 2) / camera.zoom, // slightly thicker to act as outer stroke
+            metadata: { ...shape.metadata, strokeColor: '#3b82f6', strokeStyle: 'solid' }
+         };
+         drawShapeElement(ctx, highlightShape);
+
+         const anchors = getShapeAnchors(shape);
+         
+         ctx.lineWidth = 1.5 / camera.zoom;
+         ctx.strokeStyle = '#3b82f6';
+         ctx.fillStyle = '#ffffff';
+         anchors.forEach(pt => {
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 4 / camera.zoom, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+         });
+      }
     }
 
     if (selectedIds.length > 0) {
@@ -902,20 +1027,36 @@ export function useDrawingFeature({
         const w = xMax - xMin;
         const h = yMax - yMin;
 
-        ctx.strokeStyle = '#3b82f6';
-        ctx.lineWidth = 1.5 / camera.zoom;
-        ctx.setLineDash([6, 4]);
-        ctx.strokeRect(xMin, yMin, w, h);
-        ctx.setLineDash([]);
+        const isLineOrArrow = selectedElements.length === 1 && (selectedElements[0].type === 'line' || selectedElements[0].type === 'arrow');
+
+        if (!isLineOrArrow) {
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 1.5 / camera.zoom;
+          ctx.setLineDash([6, 4]);
+          ctx.strokeRect(xMin, yMin, w, h);
+          ctx.setLineDash([]);
+        }
 
         if (selectedIds.length === 1) {
-          const handleSize = 8 / camera.zoom;
+          const activeElement = selectedElements[0];
+          const handleSize = (isLineOrArrow ? 12 : 8) / camera.zoom;
           ctx.fillStyle = '#ffffff';
-          const handles = [
-            [xMin, yMin], [xMin + w/2, yMin], [xMax, yMin],
-            [xMin, yMin + h/2],               [xMax, yMin + h/2],
-            [xMin, yMax], [xMin + w/2, yMax], [xMax, yMax]
-          ];
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 1.5 / camera.zoom;
+
+          let handles = [];
+          if (isLineOrArrow) {
+            handles = [
+              [activeElement.points[0].x, activeElement.points[0].y],
+              [activeElement.points[activeElement.points.length - 1].x, activeElement.points[activeElement.points.length - 1].y]
+            ];
+          } else {
+            handles = [
+              [xMin, yMin], [xMin + w/2, yMin], [xMax, yMin],
+              [xMin, yMin + h/2],               [xMax, yMin + h/2],
+              [xMin, yMax], [xMin + w/2, yMax], [xMax, yMax]
+            ];
+          }
           
           handles.forEach(([hx, hy]) => {
             ctx.beginPath();
@@ -1016,8 +1157,8 @@ export function useDrawingFeature({
         }).catch(() => {});
         publish('/app/delete', { id });
       });
-    selectedElementIdRef.current = anchor.id;
-    setSelectedElementId(anchor.id);
+    selectedIdsRef.current = [anchor.id];
+    setSelectedIds([anchor.id]);
     saveStroke(next, 'PUT');
     onBoardChanged?.();
     bumpPreview();
