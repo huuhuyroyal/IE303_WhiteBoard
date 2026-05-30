@@ -275,12 +275,18 @@ export function useDrawingFeature({
           if (resizeModeRef.current) {
             isDraggingShapeRef.current = false;
             dragStartPosRef.current = { x, y };
-            originalPointsRef.current = [{ 
-              id: target.id, 
-              points: JSON.parse(JSON.stringify(target.points)),
-              startConnectedTo: target.metadata?.startConnectedTo,
-              endConnectedTo: target.metadata?.endConnectedTo
-            }];
+            const connectedLines = elementsRef.current.filter(e => 
+              (e.type === 'line' || e.type === 'arrow') && 
+              (e.metadata?.startConnectedTo === target.id || e.metadata?.endConnectedTo === target.id)
+            );
+            const uniqueElements = [target, ...connectedLines];
+            
+            originalPointsRef.current = uniqueElements.map(e => ({ 
+              id: e.id, 
+              points: JSON.parse(JSON.stringify(e.points)),
+              startConnectedTo: e.metadata?.startConnectedTo,
+              endConnectedTo: e.metadata?.endConnectedTo
+            }));
             hasMovedRef.current = false;
             return;
           }
@@ -503,13 +509,58 @@ export function useDrawingFeature({
         }
 
         setElements((prev) => {
-          const next = prev.map((item) => item.id === activeId
-            ? { 
-                ...item, 
-                points: [nextP1, nextP2],
-                metadata: { ...item.metadata, startConnectedTo: connectedStart, endConnectedTo: connectedEnd }
-              }
-            : item);
+          let origXMin = 0, origYMin = 0, origW = 1, origH = 1;
+          const isLineOrArrow = mode === 'start' || mode === 'end';
+          if (!isLineOrArrow && originalPointsRef.current) {
+             const origShape = originalPointsRef.current.find(o => o.id === activeId);
+             if (origShape) {
+                const [op1, op2] = origShape.points;
+                origXMin = Math.min(op1.x, op2.x);
+                origYMin = Math.min(op1.y, op2.y);
+                origW = Math.abs(op2.x - op1.x) || 1;
+                origH = Math.abs(op2.y - op1.y) || 1;
+             }
+          }
+
+          const newXMin = Math.min(nextP1.x, nextP2.x);
+          const newYMin = Math.min(nextP1.y, nextP2.y);
+          const newW = Math.abs(nextP2.x - nextP1.x) || 1;
+          const newH = Math.abs(nextP2.y - nextP1.y) || 1;
+
+          const next = prev.map((item) => {
+            if (item.id === activeId) {
+               return { 
+                  ...item, 
+                  points: [nextP1, nextP2],
+                  metadata: { ...item.metadata, startConnectedTo: connectedStart, endConnectedTo: connectedEnd }
+               };
+            }
+            
+            if ((item.type === 'line' || item.type === 'arrow') && !isLineOrArrow && originalPointsRef.current) {
+                const originalLine = originalPointsRef.current.find(o => o.id === item.id);
+                if (originalLine) {
+                   const startConnected = originalLine.startConnectedTo === activeId;
+                   const endConnected = originalLine.endConnectedTo === activeId;
+                   
+                   if (startConnected || endConnected) {
+                      const nextPoints = [...originalLine.points];
+                      if (startConnected) {
+                         const rx = (originalLine.points[0].x - origXMin) / origW;
+                         const ry = (originalLine.points[0].y - origYMin) / origH;
+                         nextPoints[0] = { x: newXMin + rx * newW, y: newYMin + ry * newH };
+                      }
+                      if (endConnected) {
+                         const lastIdx = nextPoints.length - 1;
+                         const rx = (originalLine.points[lastIdx].x - origXMin) / origW;
+                         const ry = (originalLine.points[lastIdx].y - origYMin) / origH;
+                         nextPoints[lastIdx] = { x: newXMin + rx * newW, y: newYMin + ry * newH };
+                      }
+                      return { ...item, points: nextPoints };
+                   }
+                }
+            }
+            return item;
+          });
           elementsRef.current = next;
           return next;
         });
