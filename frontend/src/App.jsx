@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Dashboard from './pages/Dashboard';
 import CanvasBoard from './pages/CanvasBoard';
 import Login from './pages/Login';
+import RequestAccess from './pages/RequestAccess';
 
 // Protected route wrapper
 function ProtectedRoute({ children }) {
@@ -34,6 +35,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <CanvasBoard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/request-access/:boardId"
+        element={
+          <ProtectedRoute>
+            <RequestAccess />
           </ProtectedRoute>
         }
       />

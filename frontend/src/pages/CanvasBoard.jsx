@@ -52,6 +52,7 @@ export default function CanvasBoard({ boardName }) {
       boardTitle,
       authHeaders,
       setBoardTitle,
+      navigate,
     });
 
   useEffect(() => {
