@@ -226,6 +226,10 @@ export default function CanvasBoard({ boardName }) {
           strokeWidth={strokeWidth}
           setStrokeWidth={setStrokeWidth}
           onOpenShapeLibrary={() => setIsShapeLibraryOpen(true)}
+          boardId={boardId}
+          token={token}
+          camera={camera}
+          onAddMedia={drawing.addMediaElements}
         />
       )}
       {isShapeLibraryOpen && (

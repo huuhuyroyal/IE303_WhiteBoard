@@ -27,17 +27,23 @@ export default function EditPanel({ element, onUpdate, onDuplicate, onDelete, on
   const [activeMenu, setActiveMenu] = useState(null);
 
   const isPenElement = element?.type === 'path' || element?.type === 'highlight';
+  const isUploadedMedia = element?.type === 'image' || element?.type === 'pdf-page';
 
   if (!element || (
     !SHAPES.find(s => s.type === element.type) &&
     element.type !== 'ai-svg' &&
     element.type !== 'group' &&
-    !isPenElement
+    !isPenElement &&
+    !isUploadedMedia
   )) {
     return null;
   }
 
-  const currentShapeIcon = element.type === 'group' ? <Copy size={16} /> : (SHAPES.find(s => s.type === element.type)?.icon || <Square size={16} />);
+  const currentShapeIcon = element.type === 'group'
+    ? <Copy size={16} />
+    : isUploadedMedia
+      ? <PaintBucket size={16} />
+      : (SHAPES.find(s => s.type === element.type)?.icon || <Square size={16} />);
   const strokeStyle = element.metadata?.strokeStyle || 'solid';
   const strokeColor = element.metadata?.strokeColor || '#000000';
 
@@ -242,9 +248,17 @@ export default function EditPanel({ element, onUpdate, onDuplicate, onDelete, on
             </div>
             <div className="w-px h-6 bg-slate-700 mx-1"></div>
           </>
+        ) : isUploadedMedia ? (
+          <>
+            <div className="px-3 py-2 text-xs text-slate-300 max-w-[180px] truncate" title={element.metadata?.originalFilename}>
+              {element.type === 'pdf-page'
+                ? `PDF trang ${(element.metadata?.pageIndex ?? 0) + 1}/${element.metadata?.totalPages ?? '?'}`
+                : (element.metadata?.originalFilename || 'Ảnh')}
+            </div>
+            <div className="w-px h-6 bg-slate-700 mx-1"></div>
+          </>
         ) : (
           <>
-            {/* Shape Button */}
             <button
               onClick={() => toggleMenu('shape')}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${
@@ -258,57 +272,80 @@ export default function EditPanel({ element, onUpdate, onDuplicate, onDelete, on
           </>
         )}
 
-        {/* Color Button — works for both pen and shapes */}
-        <button
-          onClick={() => toggleMenu('fill')}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${
-            activeMenu === 'fill' ? 'bg-slate-700' : 'hover:bg-slate-800'
-          }`}
-        >
-          <div 
-            className="w-4 h-4 rounded-full border border-slate-500 relative overflow-hidden" 
-            style={{ backgroundColor: element.color === 'transparent' ? '#1e1e1e' : element.color }} 
-          >
-            {element.color === 'transparent' && (
-              <div className="absolute inset-0 bg-transparent flex items-center justify-center">
-                <div className="w-full h-px bg-red-500 rotate-45"></div>
+        {!isUploadedMedia && (
+          <>
+            <button
+              onClick={() => toggleMenu('fill')}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${
+                activeMenu === 'fill' ? 'bg-slate-700' : 'hover:bg-slate-800'
+              }`}
+            >
+              <div
+                className="w-4 h-4 rounded-full border border-slate-500 relative overflow-hidden"
+                style={{ backgroundColor: element.color === 'transparent' ? '#1e1e1e' : element.color }}
+              >
+                {element.color === 'transparent' && (
+                  <div className="absolute inset-0 bg-transparent flex items-center justify-center">
+                    <div className="w-full h-px bg-red-500 rotate-45"></div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-          <ChevronDown size={14} className="text-slate-500" />
-        </button>
+              <ChevronDown size={14} className="text-slate-500" />
+            </button>
 
-        <div className="w-px h-6 bg-slate-700 mx-1"></div>
+            <div className="w-px h-6 bg-slate-700 mx-1"></div>
 
-        {isPenElement ? (
-          /* Pen: width slider instead of stroke style */
-          <div className="flex items-center gap-2 px-2">
-            <span className="text-xs text-slate-400">W</span>
-            <input
-              type="range" min="1" max="40"
-              value={element.width || 4}
-              onChange={(e) => onUpdate(element.id, { width: Number(e.target.value) })}
-              className="w-20 accent-blue-500 cursor-pointer"
-            />
-            <span className="text-xs text-slate-400 w-5">{element.width || 4}</span>
-          </div>
-        ) : (
-          /* Shapes: stroke style selector */
-          <button
-            onClick={() => toggleMenu('stroke')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${
-              activeMenu === 'stroke' ? 'bg-slate-700' : 'hover:bg-slate-800'
-            }`}
-          >
-            {strokeStyle === 'solid' ? <SolidLine size={16} className="text-slate-300" /> : 
-             strokeStyle === 'dashed' ? <DashedLine size={16} className="text-slate-300" /> : 
-             <Ban size={16} className="text-slate-300" />}
-            <ChevronDown size={14} className="text-slate-500" />
-          </button>
+            {isPenElement ? (
+              <div className="flex items-center gap-2 px-2">
+                <span className="text-xs text-slate-400">W</span>
+                <input
+                  type="range" min="1" max="40"
+                  value={element.width || 4}
+                  onChange={(e) => onUpdate(element.id, { width: Number(e.target.value) })}
+                  className="w-20 accent-blue-500 cursor-pointer"
+                />
+                <span className="text-xs text-slate-400 w-5">{element.width || 4}</span>
+              </div>
+            ) : element.type !== 'group' ? (
+              <button
+                onClick={() => toggleMenu('stroke')}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${
+                  activeMenu === 'stroke' ? 'bg-slate-700' : 'hover:bg-slate-800'
+                }`}
+              >
+                {strokeStyle === 'solid' ? <SolidLine size={16} className="text-slate-300" /> :
+                 strokeStyle === 'dashed' ? <DashedLine size={16} className="text-slate-300" /> :
+                 <Ban size={16} className="text-slate-300" />}
+                <ChevronDown size={14} className="text-slate-500" />
+              </button>
+            ) : null}
+
+            <div className="w-px h-6 bg-slate-700 mx-1"></div>
+          </>
         )}
 
-        <div className="w-px h-6 bg-slate-700 mx-1"></div>
+        {isUploadedMedia && (
+          <>
+            <button
+              onClick={() => onDuplicate(element.id)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 transition-colors"
+              title="Nhân bản"
+            >
+              <Copy size={16} />
+            </button>
+            <button
+              onClick={() => onDelete(element.id)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-red-400 hover:bg-red-500/20 transition-colors"
+              title="Xóa"
+            >
+              <Trash2 size={16} />
+            </button>
+            <div className="w-px h-6 bg-slate-700 mx-1"></div>
+          </>
+        )}
 
+        {!isUploadedMedia && (
+          <>
         {/* Options Button */}
         <button
           onClick={() => toggleMenu('options')}
@@ -319,6 +356,8 @@ export default function EditPanel({ element, onUpdate, onDuplicate, onDelete, on
           <Menu size={16} className="text-slate-300" />
           <ChevronDown size={14} className="text-slate-500" />
         </button>
+          </>
+        )}
       </div>
 
       {/* Click outside overlay */}

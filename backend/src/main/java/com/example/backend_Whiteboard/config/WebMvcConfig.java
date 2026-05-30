@@ -24,6 +24,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
         Path avatarDir = Paths.get(uploadDir, "avatars").toAbsolutePath().normalize();
         registry.addResourceHandler("/uploads/avatars/**")
                 .addResourceLocations("file:" + avatarDir + "/");
+
+        Path boardsDir = Paths.get(uploadDir, "boards").toAbsolutePath().normalize();
+        registry.addResourceHandler("/uploads/boards/**")
+                .addResourceLocations("file:" + boardsDir + "/");
     }
 
     @Override

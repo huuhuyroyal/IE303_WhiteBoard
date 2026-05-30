@@ -5,6 +5,7 @@ import {
   Highlighter, Hand, ArrowRight, Star, Hexagon
 } from 'lucide-react';
 import ColorPicker from './ColorPicker';
+import BoardUploadButton from './BoardUploadButton';
 
 function ToolButton({ icon, active, onClick, title }) {
   return (
@@ -83,7 +84,20 @@ const SHAPE_ITEMS = [
   { tool: 'hexagon', icon: <Hexagon size={18} />, label: 'Hexagon', title: 'Hexagon (X)' },
 ];
 
-export default function Toolbar({ tool, setTool, color, setColor, strokeWidth, setStrokeWidth, onOpenShapeLibrary }) {
+export default function Toolbar({
+  tool,
+  setTool,
+  color,
+  setColor,
+  strokeWidth,
+  setStrokeWidth,
+  onOpenShapeLibrary,
+  boardId,
+  token,
+  camera,
+  onAddMedia,
+  readOnly = false,
+}) {
   const [openSubmenu, setOpenSubmenu] = useState(null);
 
   const toggleSubmenu = (menu) => {
@@ -176,6 +190,17 @@ export default function Toolbar({ tool, setTool, color, setColor, strokeWidth, s
           onClick={() => { setTool('note'); setOpenSubmenu(null); }}
           title="Sticky Note (N)"
         />
+        {!readOnly && boardId && onAddMedia && (
+          <>
+            <div className="w-full h-px bg-slate-200 my-1"></div>
+            <BoardUploadButton
+              boardId={boardId}
+              token={token}
+              camera={camera}
+              onAddMedia={onAddMedia}
+            />
+          </>
+        )}
       </div>
     </>
   );

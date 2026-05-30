@@ -3,6 +3,21 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { SHAPE_TOOLS, drawShapeElement, isPointInShapeElement, isShapeTool, getClosestPointOnShapePerimeter, getShapeAnchors, distanceToSegment } from './Shape';
 
 const BASE = 'http://localhost:5000';
+const MEDIA_ELEMENT_TYPES = ['ai-svg', 'image', 'pdf-page'];
+
+function isMediaElement(type) {
+  return MEDIA_ELEMENT_TYPES.includes(type);
+}
+
+function sortElementsForRender(elements) {
+  return [...elements].sort((a, b) => {
+    const aBg = a.metadata?.isBackground ? 0 : 1;
+    const bBg = b.metadata?.isBackground ? 0 : 1;
+    if (aBg !== bBg) return aBg - bBg;
+    return (a.metadata?.zIndex ?? 0) - (b.metadata?.zIndex ?? 0);
+  });
+}
+
 const CURSORS = {
   pencil: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%23ffffff' stroke='%231e1e1e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'/%3E%3C/svg%3E") 2 22, crosshair`,
   highlighter: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%23ffffff' stroke='%231e1e1e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 11-6 6v3h9l3-3'/%3E%3Cpath d='m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4'/%3E%3C/svg%3E") 2 22, crosshair`,
@@ -60,7 +75,7 @@ export function useDrawingFeature({
     if (selectedIds.length === 1 && color) {
       const activeId = selectedIds[0];
       const element = elementsRef.current.find(e => e.id === activeId);
-      if (element && element.color !== color && element.type !== 'ai-svg') {
+      if (element && element.color !== color && !isMediaElement(element.type)) {
         const oldElement = JSON.parse(JSON.stringify(element));
         const newElement = { ...element, color };
         setElements(prev => {
@@ -142,11 +157,12 @@ export function useDrawingFeature({
 
   const bumpPreview = () => setPreviewVersion((value) => value + 1);
 
-  const findElementAtPoint = (x, y) => {
+  const findElementAtPoint = (x, y, { skipBackground = false } = {}) => {
     const threshold = 15;
 
     for (let i = elementsRef.current.length - 1; i >= 0; i -= 1) {
       const element = elementsRef.current[i];
+      if (skipBackground && element.metadata?.isBackground) continue;
 
       if ((element.type === 'path' || element.type === 'highlight' || element.type === 'line') && element.points.length > 1) {
         for (let j = 0; j < element.points.length - 1; j += 1) {
@@ -162,7 +178,7 @@ export function useDrawingFeature({
         }
       }
 
-      if ((isShapeTool(element.type) || element.type === 'ai-svg') && isPointInShapeElement(x, y, element)) {
+      if ((isShapeTool(element.type) || isMediaElement(element.type)) && isPointInShapeElement(x, y, element)) {
         return element;
       }
     }
@@ -247,7 +263,7 @@ export function useDrawingFeature({
         const activeId = selectedIdsRef.current[0];
         const target = elementsRef.current.find(e => e.id === activeId);
         const _isPen = target && (target.type === 'path' || target.type === 'highlight');
-        if (target && (isShapeTool(target.type) || target.type === 'ai-svg' || _isPen)) {
+        if (target && (isShapeTool(target.type) || isMediaElement(target.type) || _isPen)) {
           let p1, p2;
           if (_isPen) {
             const xs = target.points.map(p => p.x);
@@ -323,7 +339,7 @@ export function useDrawingFeature({
           }
       }
 
-      if (groupClicked || (target && (isShapeTool(target.type) || target.type === 'ai-svg' || target.type === 'path' || target.type === 'highlight'))) {
+      if (groupClicked || (target && (isShapeTool(target.type) || isMediaElement(target.type) || target.type === 'path' || target.type === 'highlight'))) {
         resizeModeRef.current = null;
         isDraggingShapeRef.current = true;
         hasMovedRef.current = false;
@@ -373,7 +389,7 @@ export function useDrawingFeature({
 
     if (tool === 'eraser') {
       setIsDrawing(true);
-      const target = findElementAtPoint(x, y);
+      const target = findElementAtPoint(x, y, { skipBackground: true });
       if (target) deleteStroke(target.id);
       return;
     }
@@ -668,7 +684,7 @@ export function useDrawingFeature({
         const activeId = selectedIdsRef.current[0];
         const target = elementsRef.current.find(e => e.id === activeId);
         const _isHoverPen = target && (target.type === 'path' || target.type === 'highlight');
-        if (target && (isShapeTool(target.type) || target.type === 'ai-svg' || _isHoverPen)) {
+        if (target && (isShapeTool(target.type) || isMediaElement(target.type) || _isHoverPen)) {
           let p1, p2;
           if (_isHoverPen) {
             const xs = target.points.map(p => p.x);
@@ -740,7 +756,7 @@ export function useDrawingFeature({
     if (!isDrawing) return;
 
     if (tool === 'eraser') {
-      const target = findElementAtPoint(x, y);
+      const target = findElementAtPoint(x, y, { skipBackground: true });
       if (target) deleteStroke(target.id);
       return;
     }
@@ -1026,7 +1042,7 @@ export function useDrawingFeature({
     ctx.translate(camera.x, camera.y);
     ctx.scale(camera.zoom, camera.zoom);
 
-    elements.forEach((element) => {
+    sortElementsForRender(elements).forEach((element) => {
       ctx.globalAlpha = element.type === 'highlight' ? 0.35 : 1;
       ctx.lineWidth = element.width || 4;
       ctx.strokeStyle = element.color || '#1E1E1E';
@@ -1038,6 +1054,8 @@ export function useDrawingFeature({
           else ctx.lineTo(point.x, point.y);
         });
         ctx.stroke();
+      } else if (element.type === 'image' || element.type === 'pdf-page') {
+        drawImageElement(ctx, element, imageCacheRef.current, bumpPreview);
       } else if (element.type === 'ai-svg') {
         drawSvgElement(ctx, element, imageCacheRef.current, bumpPreview);
       } else if (isShapeTool(element.type)) {
@@ -1263,6 +1281,45 @@ export function useDrawingFeature({
     bumpPreview();
   };
 
+  const addMediaElements = (items) => {
+    if (!items?.length) return;
+
+    const newElements = items.map((item) => ({
+      id: crypto.randomUUID(),
+      boardId,
+      type: item.type || 'image',
+      color: '#000000',
+      width: 1,
+      points: [
+        { x: item.x, y: item.y },
+        { x: item.x + item.width, y: item.y + item.height },
+      ],
+      metadata: {
+        type: item.type || 'image',
+        tool: item.type || 'image',
+        imageUrl: item.imageUrl,
+        mimeType: item.mimeType,
+        originalFilename: item.filename,
+        sourceFilename: item.sourceFilename,
+        pageIndex: item.pageIndex,
+        totalPages: item.totalPages,
+        isBackground: true,
+        zIndex: 0,
+      },
+    }));
+
+    setElements((prev) => {
+      const next = [...prev, ...newElements];
+      elementsRef.current = next;
+      return next;
+    });
+
+    newElements.forEach((element) => saveStroke(element, 'POST'));
+    pushToUndo({ type: 'ADD_MULTIPLE', elements: newElements });
+    bumpPreview();
+    onBoardChanged?.();
+  };
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
@@ -1374,6 +1431,7 @@ export function useDrawingFeature({
     replaceElementWithSuggestion,
     duplicateElements,
     updateElement,
+    addMediaElements,
   };
 }
 
@@ -1410,6 +1468,47 @@ function resolveSvgUrl(svgUrl) {
     return svgUrl;
   }
   return `${BASE}${svgUrl.startsWith('/') ? '' : '/'}${svgUrl}`;
+}
+
+function drawImageElement(ctx, element, imageCache, onLoad) {
+  if (!element?.points || element.points.length < 2) return;
+
+  const [p1, p2] = element.points;
+  const x = Math.min(p1.x, p2.x);
+  const y = Math.min(p1.y, p2.y);
+  const width = Math.max(1, Math.abs(p2.x - p1.x));
+  const height = Math.max(1, Math.abs(p2.y - p1.y));
+  const imageUrl = resolveSvgUrl(element.metadata?.imageUrl || '');
+
+  if (!imageUrl) return;
+
+  let image = imageCache.get(imageUrl);
+  if (!image) {
+    image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => onLoad();
+    image.onerror = () => onLoad();
+    image.src = imageUrl;
+    imageCache.set(imageUrl, image);
+  }
+
+  if (image.complete && image.naturalWidth > 0) {
+    ctx.drawImage(image, x, y, width, height);
+    return;
+  }
+
+  ctx.save();
+  ctx.fillStyle = '#f8fafc';
+  ctx.fillRect(x, y, width, height);
+  ctx.setLineDash([6, 4]);
+  ctx.strokeStyle = '#94a3b8';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x, y, width, height);
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#64748b';
+  ctx.font = '12px sans-serif';
+  ctx.fillText('Đang tải...', x + 8, y + 18);
+  ctx.restore();
 }
 
 function drawSvgElement(ctx, element, imageCache, onLoad) {

@@ -22,7 +22,7 @@ export function isPointInShapeElement(x, y, element) {
     return distSq <= 100; // 10px threshold
   }
 
-  if (element.type === 'rectangle' || element.type === 'ai-svg') return true;
+  if (element.type === 'rectangle' || element.type === 'ai-svg' || element.type === 'image' || element.type === 'pdf-page') return true;
   
   if (element.type === 'circle') {
     const cx = (p1.x + p2.x) / 2;
