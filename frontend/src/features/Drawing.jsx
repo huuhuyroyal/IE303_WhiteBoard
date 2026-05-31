@@ -1212,18 +1212,6 @@ export function useDrawingFeature({
           ? 'crosshair'
           : CURSORS[tool] || 'crosshair');
 
-  const removeElement = (id) => {
-    setElements((prev) => {
-      const next = prev.filter((item) => item.id !== id);
-      elementsRef.current = next;
-      return next;
-    });
-    fetch(`${BASE}/api/board/${boardId}/stroke/${id}`, {
-      method: 'DELETE',
-      headers: authHeaders(),
-    }).catch(() => {});
-  };
-
   const replaceElementWithSuggestion = (option, targetIds) => {
     const ids = Array.isArray(targetIds) ? targetIds : [targetIds];
     const matched = ids
@@ -1427,7 +1415,7 @@ export function useDrawingFeature({
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
-    removeElement,
+    removeElement: deleteStroke,
     replaceElementWithSuggestion,
     duplicateElements,
     updateElement,

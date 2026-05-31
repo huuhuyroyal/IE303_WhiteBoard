@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { 
   Square, Circle, Triangle, Diamond, Minus, ArrowRight, Star, Hexagon,
   ChevronDown, Trash2, Copy, Menu, Ban, SquareDashed, PaintBucket, 
-  Minus as SolidLine, Ellipsis as DashedLine, Layers, PenLine, Highlighter
+  Minus as SolidLine, Ellipsis as DashedLine, Layers, PenLine, Highlighter, Sparkles
 } from 'lucide-react';
+import { useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 const SHAPES = [
   { type: 'rectangle', icon: <Square size={16} /> },
@@ -23,8 +25,28 @@ const COLORS = [
   '#86efac', '#6ee7b7', '#93c5fd', '#c4b5fd', '#f0abfc'
 ];
 
-export default function EditPanel({ element, onUpdate, onDuplicate, onDelete, onGroup, onUngroup }) {
+export default function EditPanel({ boardId, element, onUpdate, onDuplicate, onDelete, onGroup, onUngroup }) {
   const [activeMenu, setActiveMenu] = useState(null);
+  const { user } = useAuth();
+  const token = user?.token;
+  const [variants, setVariants] = useState([]);
+  const [loadingVariants, setLoadingVariants] = useState(false);
+
+  useEffect(() => {
+    if (activeMenu === 'shape' && element?.type === 'ai-svg' && element?.metadata?.label) {
+      setLoadingVariants(true);
+      fetch(`http://localhost:5000/api/board/${boardId}/ai-suggest/label/${encodeURIComponent(element.metadata.label)}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setVariants(data);
+        })
+        .finally(() => setLoadingVariants(false));
+    }
+  }, [activeMenu, element?.type, element?.metadata?.label, boardId]);
 
   const isPenElement = element?.type === 'path' || element?.type === 'highlight';
   const isUploadedMedia = element?.type === 'image' || element?.type === 'pdf-page';
@@ -43,7 +65,9 @@ export default function EditPanel({ element, onUpdate, onDuplicate, onDelete, on
     ? <Copy size={16} />
     : isUploadedMedia
       ? <PaintBucket size={16} />
-      : (SHAPES.find(s => s.type === element.type)?.icon || <Square size={16} />);
+      : element.type === 'ai-svg' 
+        ? <Sparkles size={16} /> 
+        : (SHAPES.find(s => s.type === element.type)?.icon || <Square size={16} />);
   const strokeStyle = element.metadata?.strokeStyle || 'solid';
   const strokeColor = element.metadata?.strokeColor || '#000000';
 
@@ -55,27 +79,66 @@ export default function EditPanel({ element, onUpdate, onDuplicate, onDelete, on
     onUpdate(element.id, { metadata: { ...(element.metadata || {}), ...updates } });
   };
 
+  const updateColor = (c) => {
+    if (element.type === 'ai-svg') {
+      onUpdate(element.id, { color: c, metadata: { ...(element.metadata || {}), color: c } });
+    } else {
+      onUpdate(element.id, { color: c });
+    }
+  };
+
   return (
     <div className="relative">
       {/* Shape Menu */}
       {activeMenu === 'shape' && (
-        <div className="absolute bottom-full mb-3 left-0 bg-[#1e1e1e] border border-slate-700 p-2 rounded-xl shadow-2xl z-50 w-64">
-          <div className="grid grid-cols-5 gap-1">
-            {SHAPES.map(s => (
-              <button
-                key={s.type}
-                className={`p-2 rounded-lg flex items-center justify-center transition-colors ${
-                  element.type === s.type ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700'
-                }`}
-                onClick={() => {
-                  onUpdate(element.id, { type: s.type });
-                  setActiveMenu(null);
-                }}
-              >
-                {s.icon}
-              </button>
-            ))}
-          </div>
+        <div className="absolute bottom-full mb-3 left-0 bg-[#1e1e1e] border border-slate-700 p-2 rounded-xl shadow-2xl z-50 w-64 max-h-64 overflow-y-auto">
+          {element.type === 'ai-svg' ? (
+            loadingVariants ? (
+              <div className="p-4 text-center text-slate-400 text-sm">Đang tải...</div>
+            ) : variants.length > 0 ? (
+              <div className="grid grid-cols-4 gap-2">
+                {variants.map(v => (
+                  <button
+                    key={v.sampleId}
+                    className={`p-1 rounded-lg flex items-center justify-center transition-colors border-2 ${
+                      element.metadata?.sampleId === v.sampleId ? 'border-blue-500 bg-slate-800' : 'border-transparent hover:bg-slate-700'
+                    }`}
+                    onClick={() => {
+                      onUpdate(element.id, { 
+                        metadata: { ...(element.metadata || {}), svgUrl: v.svgUrl, sampleId: v.sampleId } 
+                      });
+                      setActiveMenu(null);
+                    }}
+                  >
+                    <img 
+                      src={v.svgUrl.startsWith('http') ? v.svgUrl : `http://localhost:5000${v.svgUrl.startsWith('/') ? '' : '/'}${v.svgUrl}`} 
+                      alt={v.label} 
+                      className="w-10 h-10 object-contain filter invert opacity-80" 
+                    />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="p-4 text-center text-slate-400 text-sm">Không có mẫu khác</div>
+            )
+          ) : (
+            <div className="grid grid-cols-5 gap-1">
+              {SHAPES.map(s => (
+                <button
+                  key={s.type}
+                  className={`p-2 rounded-lg flex items-center justify-center transition-colors ${
+                    element.type === s.type ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700'
+                  }`}
+                  onClick={() => {
+                    onUpdate(element.id, { type: s.type });
+                    setActiveMenu(null);
+                  }}
+                >
+                  {s.icon}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -84,7 +147,7 @@ export default function EditPanel({ element, onUpdate, onDuplicate, onDelete, on
         <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 bg-[#1e1e1e] border border-slate-700 p-3 rounded-xl shadow-2xl z-50 w-[340px]">
           <div className="flex gap-2 mb-4">
             <button
-              onClick={() => onUpdate(element.id, { color: '#f97316' })}
+              onClick={() => updateColor('#f97316')}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 element.color !== 'transparent' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'
               }`}
@@ -92,7 +155,7 @@ export default function EditPanel({ element, onUpdate, onDuplicate, onDelete, on
               <PaintBucket size={14} /> Fill
             </button>
             <button
-              onClick={() => onUpdate(element.id, { color: 'transparent' })}
+              onClick={() => updateColor('transparent')}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 element.color === 'transparent' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'
               }`}
@@ -108,7 +171,7 @@ export default function EditPanel({ element, onUpdate, onDuplicate, onDelete, on
                   element.color === c ? 'border-blue-500 shadow-[0_0_0_2px_#3b82f6]' : 'border-transparent'
                 }`}
                 style={{ backgroundColor: c, border: c === '#ffffff' ? '2px solid #e5e7eb' : undefined }}
-                onClick={() => onUpdate(element.id, { color: c })}
+                onClick={() => updateColor(c)}
               />
             ))}
             <div className="relative w-8 h-8 rounded-full overflow-hidden transition-transform hover:scale-110 shadow-inner"
@@ -117,7 +180,7 @@ export default function EditPanel({ element, onUpdate, onDuplicate, onDelete, on
                 type="color"
                 className="absolute inset-[-10px] w-[50px] h-[50px] opacity-0 cursor-pointer"
                 value={element.color === 'transparent' ? '#ffffff' : element.color}
-                onChange={(e) => onUpdate(element.id, { color: e.target.value })}
+                onChange={(e) => updateColor(e.target.value)}
               />
             </div>
           </div>
@@ -306,7 +369,7 @@ export default function EditPanel({ element, onUpdate, onDuplicate, onDelete, on
                 />
                 <span className="text-xs text-slate-400 w-5">{element.width || 4}</span>
               </div>
-            ) : element.type !== 'group' ? (
+            ) : element.type !== 'group' && element.type !== 'ai-svg' ? (
               <button
                 onClick={() => toggleMenu('stroke')}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${

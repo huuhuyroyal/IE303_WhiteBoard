@@ -129,6 +129,34 @@ public class AISuggestionController {
         }
     }
 
+    /**
+     * ENDPOINT 3:
+     * Lấy tất cả các hình (variants) của một label cụ thể
+     */
+    @GetMapping("/label/{label}")
+    public ResponseEntity<?> getShapesByLabel(
+            @PathVariable UUID boardId,
+            @PathVariable String label) {
+        System.out.println("====== getShapesByLabel called with label: '" + label + "' ======");
+        try {
+            List<AIShape> shapes = aiShapeRepository.findByLabel(label);
+            System.out.println("====== Found " + shapes.size() + " shapes for label: '" + label + "' ======");
+            List<Map<String, Object>> options = shapes.stream()
+                    .map(shape -> {
+                        Map<String, Object> item = new HashMap<>();
+                        item.put("sampleId", shape.getSampleId());
+                        item.put("label", shape.getLabel());
+                        item.put("svgUrl", shape.getSvgUrl());
+                        return item;
+                    })
+                    .toList();
+            return ResponseEntity.ok(options);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("Lỗi lấy shapes theo label: " + e.getMessage());
+        }
+    }
+
     private List<List<List<Double>>> convertStrokesToGoogleInk(JsonNode strokesNode) {
         List<List<List<Double>>> inkData = new ArrayList<>();
 

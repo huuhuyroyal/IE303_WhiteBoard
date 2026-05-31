@@ -354,6 +354,7 @@ export default function CanvasBoard({ boardName }) {
               }`}
             >
               <EditPanel
+                boardId={boardId}
                 element={selectedElement}
                 onUpdate={(id, updates) => {
                   if (id === 'group') {
