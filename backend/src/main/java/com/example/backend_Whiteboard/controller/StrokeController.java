@@ -25,6 +25,8 @@ public class StrokeController {
     private UserRepository userRepository;
     @Autowired
     private com.example.backend_Whiteboard.config.JwtUtil jwtUtil;
+    @Autowired
+    private com.example.backend_Whiteboard.service.CloudinaryService cloudinaryService;
 
     // GET /api/board/{boardId}/stroke
     @GetMapping
@@ -97,6 +99,19 @@ public class StrokeController {
     public ResponseEntity<?> deleteStroke(@PathVariable UUID boardId, @PathVariable UUID id) {
         if (!strokeRepository.existsById(id))
             return ResponseEntity.notFound().build();
+            
+        strokeRepository.findById(id).ifPresent(stroke -> {
+            if (stroke.getMetadata() != null) {
+                String type = (String) stroke.getMetadata().get("type");
+                if ("image".equals(type) || "pdf-page".equals(type)) {
+                    Object urlObj = stroke.getMetadata().get("imageUrl");
+                    if (urlObj instanceof String) {
+                        cloudinaryService.deleteImage((String) urlObj);
+                    }
+                }
+            }
+        });
+
         strokeRepository.deleteById(id);
         return ResponseEntity.ok().build();
     }

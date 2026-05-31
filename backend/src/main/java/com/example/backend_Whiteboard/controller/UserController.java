@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import com.example.backend_Whiteboard.service.CloudinaryService;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -35,6 +36,9 @@ public class UserController {
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
+
+    @Autowired
+    private CloudinaryService cloudinaryService;
 
     @GetMapping("/profile")
     public ResponseEntity<?> getProfile(@RequestHeader(value = "Authorization", required = false) String authHeader) {
@@ -104,22 +108,12 @@ public class UserController {
         }
 
         User user = userOpt.get();
-        String extension = switch (contentType) {
-            case "image/png" -> "png";
-            case "image/gif" -> "gif";
-            case "image/webp" -> "webp";
-            default -> "jpg";
-        };
-
         try {
-            Path avatarDir = Paths.get(uploadDir, "avatars").toAbsolutePath().normalize();
-            Files.createDirectories(avatarDir);
+            if (user.getAvatarUrl() != null && !user.getAvatarUrl().isEmpty()) {
+                cloudinaryService.deleteImage(user.getAvatarUrl());
+            }
 
-            String filename = user.getId() + "." + extension;
-            Path target = avatarDir.resolve(filename);
-            Files.write(target, file.getBytes());
-
-            String avatarUrl = "/uploads/avatars/" + filename;
+            String avatarUrl = cloudinaryService.uploadImage(file, "whiteboard_app/avatars");
             user.setAvatarUrl(avatarUrl);
             userRepository.save(user);
 
@@ -127,7 +121,7 @@ public class UserController {
                     "avatarUrl", avatarUrl,
                     "profile", toProfileResponse(user)));
         } catch (IOException e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to save avatar"));
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to upload avatar to Cloudinary"));
         }
     }
 

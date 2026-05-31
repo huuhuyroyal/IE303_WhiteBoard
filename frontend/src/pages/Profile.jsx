@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import UserInfo from "../profile/UserInfo";
 import {
   ArrowLeft,
   Pencil,
@@ -11,13 +10,14 @@ import {
   Calendar,
   Mail,
   User,
+  Upload,
 } from "lucide-react";
 
 const BASE = "http://localhost:5000";
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -49,6 +49,11 @@ export default function Profile() {
       setProfile(data);
       setDisplayName(data.displayName || "");
       setEmail(data.email || "");
+      
+      // Auto-sync global user context if avatarUrl exists and is different
+      if (data.avatarUrl && data.avatarUrl !== user?.avatarUrl) {
+        updateUser({ avatarUrl: data.avatarUrl });
+      }
     } catch {
       setError("Không kết nối được máy chủ");
       setProfile(null);
@@ -158,6 +163,9 @@ export default function Profile() {
                   isEditing={isEditing}
                   onUploadSuccess={(updated) => {
                     setProfile(updated);
+                    if (updated.avatarUrl) {
+                      updateUser({ avatarUrl: updated.avatarUrl });
+                    }
                     setMessage("Đã cập nhật ảnh đại diện");
                   }}
                 />
@@ -230,7 +238,7 @@ export default function Profile() {
                   icon={User}
                   label="Username"
                   value={
-                    <span className="text-slate-700">@{profile.username}</span>
+                    <span className="text-slate-700">{profile.username}</span>
                   }
                 />
                 <Field
@@ -307,5 +315,101 @@ function StatCard({ icon, value, label }) {
         <p className="text-sm text-slate-600">{label}</p>
       </div>
     </article>
+  );
+}
+
+function UserInfo({ profile, token, isEditing, onUploadSuccess }) {
+  return (
+    <article className="flex gap-4 items-center flex-[1_0_0] max-sm:flex-col max-sm:items-center max-sm:text-center">
+      <div className="relative">
+        <img
+          src={profile?.avatarUrl || "https://via.placeholder.com/119"}
+          alt={profile?.displayName}
+          className="w-[80px] h-[80px] sm:w-[119px] sm:h-[119px] rounded-full object-cover border border-slate-200"
+        />
+      </div>
+      <div className="flex flex-col gap-1 max-sm:items-center">
+        <h1 className="text-[1.5rem] font-bold text-neutral-900">
+          {profile?.displayName || profile?.username}
+        </h1>
+        <p className="text-[1.125rem] text-neutral-900 text-opacity-50">
+          {profile?.email || "Chưa cập nhật email"}
+        </p>
+        {isEditing && (
+          <div className="mt-2">
+            <UploadButton token={token} onUploadSuccess={onUploadSuccess} />
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+function UploadButton({ token, onUploadSuccess }) {
+  const fileInputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setError("");
+
+    if (!file.type.startsWith("image/")) {
+      setError("Vui lòng chọn file hình ảnh");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Ảnh không được vượt quá 5MB");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      setUploading(true);
+      const res = await fetch(`${BASE}/api/user/avatar`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Không thể tải ảnh lên");
+        return;
+      }
+      onUploadSuccess?.(data.profile);
+    } catch {
+      setError("Không kết nối được máy chủ");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-1">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
+      >
+        <Upload size={16} />
+        {uploading ? "Đang tải..." : "Đổi ảnh đại diện"}
+      </button>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+    </div>
   );
 }

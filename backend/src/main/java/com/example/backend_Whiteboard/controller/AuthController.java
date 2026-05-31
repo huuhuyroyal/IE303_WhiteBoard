@@ -46,7 +46,8 @@ public class AuthController {
         return ResponseEntity.ok(Map.of(
                 "token", token,
                 "userId", user.getId().toString(),
-                "username", user.getUsername()));
+                "username", user.getUsername(),
+                "avatarUrl", user.getAvatarUrl() != null ? user.getAvatarUrl() : ""));
     }
 
     // POST /api/auth/login
@@ -70,7 +71,8 @@ public class AuthController {
         return ResponseEntity.ok(Map.of(
                 "token", token,
                 "userId", user.getId().toString(),
-                "username", user.getUsername()));
+                "username", user.getUsername(),
+                "avatarUrl", user.getAvatarUrl() != null ? user.getAvatarUrl() : ""));
     }
 
     // GET /api/auth/me
@@ -86,7 +88,8 @@ public class AuthController {
         return userRepository.findByUsername(jwtUtil.getUsernameFromToken(token))
                 .<ResponseEntity<?>>map(u -> ResponseEntity.ok(Map.of(
                         "userId", u.getId().toString(),
-                        "username", u.getUsername())))
+                        "username", u.getUsername(),
+                        "avatarUrl", u.getAvatarUrl() != null ? u.getAvatarUrl() : "")))
                 .orElse(ResponseEntity.status(404).body(Map.of("error", "User not found")));
     }
 

@@ -7,7 +7,8 @@ function getStoredUser() {
   const token = localStorage.getItem('token');
   const username = localStorage.getItem('username');
   const userId = localStorage.getItem('userId');
-  return token && username ? { token, username, userId } : null;
+  const avatarUrl = localStorage.getItem('avatarUrl');
+  return token && username ? { token, username, userId, avatarUrl } : null;
 }
 
 export function AuthProvider({ children }) {
@@ -18,18 +19,37 @@ export function AuthProvider({ children }) {
     localStorage.setItem('token', data.token);
     localStorage.setItem('username', data.username);
     localStorage.setItem('userId', data.userId);
+    if (data.avatarUrl) {
+      localStorage.setItem('avatarUrl', data.avatarUrl);
+    } else {
+      localStorage.removeItem('avatarUrl');
+    }
     setUser(data);
+  };
+
+  const updateUser = (updates) => {
+    setUser((prev) => {
+      const next = { ...prev, ...updates };
+      if (next.avatarUrl) {
+        localStorage.setItem('avatarUrl', next.avatarUrl);
+      }
+      if (next.username) {
+        localStorage.setItem('username', next.username);
+      }
+      return next;
+    });
   };
 
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
     localStorage.removeItem('userId');
+    localStorage.removeItem('avatarUrl');
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUser, loading }}>
       {children}
     </AuthContext.Provider>
   );
