@@ -5,8 +5,11 @@ import com.example.backend_Whiteboard.model.User;
 import com.example.backend_Whiteboard.model.BoardMember;
 import com.example.backend_Whiteboard.repository.BoardRepository;
 import com.example.backend_Whiteboard.repository.UserRepository;
+import com.example.backend_Whiteboard.repository.NotificationRepository;
+import com.example.backend_Whiteboard.model.Notification;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -27,6 +30,12 @@ public class BoardController {
     
     @Autowired
     private com.example.backend_Whiteboard.repository.PermissionRequestRepository permissionRequestRepository;
+
+    @Autowired
+    private NotificationRepository notificationRepository;
+
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
 
     @Autowired
     private com.example.backend_Whiteboard.config.JwtUtil jwtUtil;
@@ -143,6 +152,22 @@ public class BoardController {
             com.example.backend_Whiteboard.model.BoardMember member = new com.example.backend_Whiteboard.model.BoardMember(board, targetUser);
             boardMemberRepository.save(member);
             
+            // Create notification
+            String msg = "User " + userRepository.findById(currentUserId).map(User::getUsername).orElse("Someone") + " invited you to board '" + board.getTitle() + "'";
+            Notification notification = new Notification(targetUser, "INVITE", msg, board.getId());
+            notificationRepository.save(notification);
+
+            // Push notification via WebSocket
+            Map<String, Object> notifPayload = Map.of(
+                    "id", notification.getId(),
+                    "message", notification.getMessage(),
+                    "type", notification.getType(),
+                    "boardId", notification.getBoardId() != null ? notification.getBoardId() : "",
+                    "isRead", notification.isRead(),
+                    "createdAt", notification.getCreatedAt()
+            );
+            messagingTemplate.convertAndSend("/topic/notifications/" + targetUser.getId(), (Object) notifPayload);
+
             return ResponseEntity.ok(Map.of("message", "Board shared successfully with " + targetUsername));
 
         } catch (org.springframework.dao.DataIntegrityViolationException e) {

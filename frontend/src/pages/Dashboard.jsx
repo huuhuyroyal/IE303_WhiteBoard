@@ -13,6 +13,7 @@ import {
   LogOut,
 } from "lucide-react";
 import ShareModal from "../components/ShareModal";
+import NotificationBell from "../components/NotificationBell";
 
 function BoardThumbnail({ board }) {
   const gradients = [
@@ -446,11 +447,14 @@ export default function Dashboard() {
             />
           </div>
 
-          <div
-            title={user?.username}
-            className="ml-auto flex items-center gap-3 w-8 h-8 bg-violet-500 rounded-full flex items-center justify-center text-white text-sm font-bold cursor-default"
-          >
-            {user?.username?.[0]?.toUpperCase() || "U"}
+          <div className="ml-auto flex items-center gap-4">
+            <NotificationBell />
+            <div
+              title={user?.username}
+              className="w-8 h-8 bg-violet-500 rounded-full flex items-center justify-center text-white text-sm font-bold cursor-default"
+            >
+              {user?.username?.[0]?.toUpperCase() || "U"}
+            </div>
           </div>
         </header>
 
