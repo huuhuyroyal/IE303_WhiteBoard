@@ -96,11 +96,10 @@
 			<scope>runtime</scope>
 		</dependency>
 
-		<!-- .env file support -->
 		<dependency>
-			<groupId>io.github.cdimascio</groupId>
-			<artifactId>java-dotenv</artifactId>
-			<version>5.2.2</version>
+			<groupId>com.cloudinary</groupId>
+			<artifactId>cloudinary-http44</artifactId>
+			<version>1.36.0</version>
 		</dependency>
 	</dependencies>
 

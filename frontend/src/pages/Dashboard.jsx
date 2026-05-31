@@ -390,10 +390,14 @@ export default function Dashboard() {
             onClick={() => navigate("/profile")}
             className="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-100 transition-colors text-left"
           >
-            <div className="w-7 h-7 bg-blue-100 rounded-md flex items-center justify-center">
-              <span className="text-blue-700 text-xs font-bold">
-                {user?.username?.[0]?.toUpperCase() || "U"}
-              </span>
+            <div className="w-7 h-7 bg-blue-100 rounded-md flex items-center justify-center overflow-hidden">
+              {user?.avatarUrl ? (
+                <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-blue-700 text-xs font-bold">
+                  {user?.username?.[0]?.toUpperCase() || "U"}
+                </span>
+              )}
             </div>
             <span className="text-sm font-medium text-slate-700 flex-1 truncate">
               {user?.username || "Guest"}
@@ -408,7 +412,7 @@ export default function Dashboard() {
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors"
           >
             <UserCircle size={16} />
-            Hồ sơ
+            Profile
           </button>
           <button
             onClick={() => setActiveTab("my_boards")}
@@ -467,9 +471,13 @@ export default function Dashboard() {
             type="button"
             title={user?.username}
             onClick={() => navigate("/profile")}
-            className="ml-auto w-8 h-8 bg-violet-500 rounded-full flex items-center justify-center text-white text-sm font-bold hover:bg-violet-600 transition-colors"
+            className="ml-auto w-8 h-8 bg-violet-500 rounded-full flex items-center justify-center text-white text-sm font-bold hover:bg-violet-600 transition-colors overflow-hidden"
           >
-            {user?.username?.[0]?.toUpperCase() || "U"}
+            {user?.avatarUrl ? (
+              <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              user?.username?.[0]?.toUpperCase() || "U"
+            )}
           </button>
         </header>
 

@@ -35,6 +35,7 @@ export default function CanvasBoard({ boardName }) {
   const [selectedElement, setSelectedElement] = useState(null);
   const [isInteracting, setIsInteracting] = useState(false);
   const [isShapeLibraryOpen, setIsShapeLibraryOpen] = useState(false);
+  const [copiedElementIds, setCopiedElementIds] = useState(null);
 
   const [otherCursors, setOtherCursors] = useState({});
   const lastPublishRef = useRef(0);
@@ -127,6 +128,8 @@ export default function CanvasBoard({ boardName }) {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
       if (e.ctrlKey && e.key.toLowerCase() === 'g') {
         e.preventDefault();
         if (e.shiftKey) {
@@ -135,10 +138,36 @@ export default function CanvasBoard({ boardName }) {
           handleGroup();
         }
       }
+
+      if (e.ctrlKey && e.key.toLowerCase() === 'c') {
+        if (selectedElement) {
+          e.preventDefault();
+          setCopiedElementIds(selectedElement.selectedIds || [selectedElement.id]);
+        }
+      }
+
+      if (e.ctrlKey && e.key.toLowerCase() === 'v') {
+        if (copiedElementIds && copiedElementIds.length > 0) {
+          e.preventDefault();
+          drawing.duplicateElements(copiedElementIds);
+        }
+      }
+
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        if (selectedElement) {
+          e.preventDefault();
+          if (selectedElement.type === 'group' || selectedElement.selectedIds) {
+            selectedElement.selectedIds.forEach(uid => drawing.removeElement(uid));
+          } else {
+            drawing.removeElement(selectedElement.id);
+          }
+          setSelectedElement(null);
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleGroup, handleUngroup]);
+  }, [handleGroup, handleUngroup, selectedElement, copiedElementIds, drawing]);
 
   const wrappedPointerDown = (event) => {
     if (userRole === "VIEWER") {
