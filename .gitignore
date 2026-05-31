@@ -26,3 +26,7 @@ backend/build/
 
 # Ignore local database configuration
 src/main/resources/application.properties
+
+# User uploads
+uploads/
+backend/uploads/

@@ -12,6 +12,7 @@ import{
   X,
   LogOut,
   Users,
+  UserCircle,
 } from "lucide-react";
 import ShareModal from "../components/ShareModal";
 
@@ -384,7 +385,11 @@ export default function Dashboard() {
         </div>
 
         <div className="px-4 py-3 border-b border-slate-100">
-          <div className="flex items-center gap-2.5 p-2 rounded-lg">
+          <button
+            type="button"
+            onClick={() => navigate("/profile")}
+            className="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-100 transition-colors text-left"
+          >
             <div className="w-7 h-7 bg-blue-100 rounded-md flex items-center justify-center">
               <span className="text-blue-700 text-xs font-bold">
                 {user?.username?.[0]?.toUpperCase() || "U"}
@@ -393,10 +398,18 @@ export default function Dashboard() {
             <span className="text-sm font-medium text-slate-700 flex-1 truncate">
               {user?.username || "Guest"}
             </span>
-          </div>
+          </button>
         </div>
 
         <nav className="flex-1 px-3 py-3 space-y-0.5">
+          <button
+            type="button"
+            onClick={() => navigate("/profile")}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+          >
+            <UserCircle size={16} />
+            Hồ sơ
+          </button>
           <button
             onClick={() => setActiveTab("my_boards")}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -450,12 +463,14 @@ export default function Dashboard() {
             />
           </div>
 
-          <div
+          <button
+            type="button"
             title={user?.username}
-            className="ml-auto flex items-center gap-3 w-8 h-8 bg-violet-500 rounded-full flex items-center justify-center text-white text-sm font-bold cursor-default"
+            onClick={() => navigate("/profile")}
+            className="ml-auto w-8 h-8 bg-violet-500 rounded-full flex items-center justify-center text-white text-sm font-bold hover:bg-violet-600 transition-colors"
           >
             {user?.username?.[0]?.toUpperCase() || "U"}
-          </div>
+          </button>
         </header>
 
         <main className="flex-1 overflow-auto px-8 py-8">
