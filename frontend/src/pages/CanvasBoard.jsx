@@ -9,7 +9,7 @@ import EditPanel from "../components/EditPanel";
 import ShareModal from "../components/ShareModal";
 import ZoomControls from "../components/ZoomControls";
 import BoardTopBar from "../components/BoardTopBar";
-import ShapeLibraryPanel from "../components/ShapeLibraryPanel";
+import NotificationBell from "../components/NotificationBell";
 
 import useBoardSocket from "../hooks/useBoardSocket";
 import useBoardData from "../hooks/useBoardData";
@@ -287,6 +287,8 @@ export default function CanvasBoard({ boardName }) {
         <BoardTimer boardId={boardId} />
 
         <div className="bg-white p-2 flex items-center gap-2 rounded-lg shadow-sm border border-slate-200">
+          <NotificationBell />
+          <div className="w-px h-6 bg-slate-200 mx-1"></div>
           <button
             onClick={handleExport}
             className="flex items-center gap-2 hover:bg-slate-100 px-3 py-1.5 rounded-md text-sm font-medium text-slate-600 transition-colors"

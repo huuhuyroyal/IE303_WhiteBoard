@@ -15,6 +15,7 @@ import{
   UserCircle,
 } from "lucide-react";
 import ShareModal from "../components/ShareModal";
+import NotificationBell from "../components/NotificationBell";
 
 function BoardThumbnail({ board }) {
   const gradients = [
@@ -467,18 +468,15 @@ export default function Dashboard() {
             />
           </div>
 
-          <button
-            type="button"
-            title={user?.username}
-            onClick={() => navigate("/profile")}
-            className="ml-auto w-8 h-8 bg-violet-500 rounded-full flex items-center justify-center text-white text-sm font-bold hover:bg-violet-600 transition-colors overflow-hidden"
-          >
-            {user?.avatarUrl ? (
-              <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-            ) : (
-              user?.username?.[0]?.toUpperCase() || "U"
-            )}
-          </button>
+          <div className="ml-auto flex items-center gap-4">
+            <NotificationBell />
+            <div
+              title={user?.username}
+              className="w-8 h-8 bg-violet-500 rounded-full flex items-center justify-center text-white text-sm font-bold cursor-default"
+            >
+              {user?.username?.[0]?.toUpperCase() || "U"}
+            </div>
+          </div>
         </header>
 
         <main className="flex-1 overflow-auto px-8 py-8">
