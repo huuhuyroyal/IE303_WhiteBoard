@@ -188,8 +188,6 @@ public class BoardController {
             );
             messagingTemplate.convertAndSend("/topic/notifications/" + targetUser.getId(), (Object) notifPayload);
 
-            return ResponseEntity.ok(Map.of("message", "Board shared successfully with " + targetUsername));
-
             return ResponseEntity
                     .ok(Map.of("message", "Board shared successfully with " + targetUsername, "role", role));
 
