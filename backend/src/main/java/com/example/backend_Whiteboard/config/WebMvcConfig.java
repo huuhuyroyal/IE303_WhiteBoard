@@ -1,15 +1,34 @@
 package com.example.backend_Whiteboard.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
 
     @Autowired
     private BoardAccessInterceptor boardAccessInterceptor;
+
+    @Value("${app.upload.dir:uploads}")
+    private String uploadDir;
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        Path avatarDir = Paths.get(uploadDir, "avatars").toAbsolutePath().normalize();
+        registry.addResourceHandler("/uploads/avatars/**")
+                .addResourceLocations("file:" + avatarDir + "/");
+
+        Path boardsDir = Paths.get(uploadDir, "boards").toAbsolutePath().normalize();
+        registry.addResourceHandler("/uploads/boards/**")
+                .addResourceLocations("file:" + boardsDir + "/");
+    }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {

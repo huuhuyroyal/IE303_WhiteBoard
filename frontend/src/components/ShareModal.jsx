@@ -10,6 +10,7 @@ export default function ShareModal({
 }) {
   const { user } = useAuth();
   const [username, setUsername] = useState("");
+  const [selectedRole, setSelectedRole] = useState("EDITOR");
   const [error, setError] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [owner, setOwner] = useState(null);
@@ -78,7 +79,7 @@ export default function ShareModal({
           const availableUsers = data.filter(
             (u) =>
               u.username !== owner &&
-              !sharedUsers.includes(u.username) &&
+              !sharedUsers.some(m => m.username === u.username) &&
               u.username !== user?.username,
           );
           setSuggestions(availableUsers);
@@ -94,11 +95,11 @@ export default function ShareModal({
     if (!username.trim()) return;
 
     const targetUsername = username.trim();
-    const success = await onConfirm(targetUsername, setError);
+    const success = await onConfirm(targetUsername, selectedRole, setError);
 
     if (success) {
       setSharedUsers((prev) =>
-        prev.includes(targetUsername) ? prev : [...prev, targetUsername],
+        prev.some(m => m.username === targetUsername) ? prev : [...prev, { username: targetUsername, role: selectedRole }],
       );
       setUsername("");
     }
@@ -129,7 +130,7 @@ export default function ShareModal({
       );
       if (res.ok) {
         setPendingRequests(prev => prev.filter(r => r.id !== requestId));
-        setSharedUsers(prev => [...prev, reqUsername]);
+        setSharedUsers(prev => [...prev, { username: reqUsername, role: "EDITOR" }]);
       }
     } catch (err) {
       console.error("Failed to approve request", err);
@@ -154,6 +155,40 @@ export default function ShareModal({
     }
   };
 
+  const updateRole = async (memberUsername, newRole) => {
+    try {
+      const token = user?.token;
+      const res = await fetch(`http://localhost:5000/api/board/${boardId}/share`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ username: memberUsername, role: newRole })
+      });
+      if (res.ok) {
+        setSharedUsers(prev => prev.map(m => m.username === memberUsername ? { ...m, role: newRole } : m));
+      }
+    } catch (err) {
+      console.error("Failed to update role", err);
+    }
+  };
+
+  const removeMember = async (memberUsername) => {
+    try {
+      const token = user?.token;
+      const res = await fetch(`http://localhost:5000/api/board/${boardId}/members/${memberUsername}`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        setSharedUsers(prev => prev.filter(m => m.username !== memberUsername));
+      }
+    } catch (err) {
+      console.error("Failed to remove member", err);
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 font-sans"
@@ -171,7 +206,7 @@ export default function ShareModal({
 
         <div className="mb-6 relative">
           <div
-            className={`border rounded-lg transition-colors overflow-visible ${isFocused ? "border-blue-600 ring-1 ring-blue-600" : "border-slate-400"}`}
+            className={`border rounded-lg transition-colors overflow-visible flex items-center pr-2 ${isFocused ? "border-blue-600 ring-1 ring-blue-600" : "border-slate-400"}`}
           >
             <input
               type="text"
@@ -188,7 +223,16 @@ export default function ShareModal({
               }}
               className="w-full px-4 py-3.5 text-sm text-slate-800 outline-none bg-transparent relative z-10"
             />
-            {isFocused && suggestions.length > 0 && (
+            <select
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+              className="text-sm border-none bg-transparent outline-none cursor-pointer text-slate-600 focus:ring-0 mr-2"
+            >
+              <option value="VIEWER">Người xem</option>
+              <option value="EDITOR">Người chỉnh sửa</option>
+            </select>
+          </div>
+          {isFocused && suggestions.length > 0 && (
               <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
                 {suggestions.map((s) => (
                   <div
@@ -213,7 +257,6 @@ export default function ShareModal({
                 ))}
               </div>
             )}
-          </div>
           {error && (
             <p className="text-xs text-red-500 mt-1 absolute">{error}</p>
           )}
@@ -281,21 +324,43 @@ export default function ShareModal({
             )}
 
             {sharedUsers
-              .filter((member) => member !== owner)
+              .filter((member) => member.username !== owner)
               .map((member) => (
-                <div key={member} className="flex items-center justify-between">
+                <div key={member.username} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-sm">
-                      {member[0]?.toUpperCase()}
+                      {member.username[0]?.toUpperCase()}
                     </div>
                     <div>
                       <p className="text-[15px] font-medium text-slate-800">
-                        {member} {member === user?.username ? "(you)" : ""}
+                        {member.username} {member.username === user?.username ? "(you)" : ""}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 text-slate-600 px-1 py-1 rounded">
-                    <span className="text-sm">Member</span>
+                  <div className="flex items-center gap-2">
+                    {owner === user?.username ? (
+                      <>
+                        <select
+                          value={member.role}
+                          onChange={(e) => updateRole(member.username, e.target.value)}
+                          className="text-sm border-none bg-transparent outline-none cursor-pointer text-slate-600 hover:text-slate-900"
+                        >
+                          <option value="VIEWER">Người xem</option>
+                          <option value="EDITOR">Người chỉnh sửa</option>
+                        </select>
+                        <button
+                          onClick={() => removeMember(member.username)}
+                          className="text-slate-400 hover:text-red-500 transition-colors ml-2 p-1"
+                          title="Xóa quyền truy cập"
+                        >
+                          &times;
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-sm text-slate-600">
+                        {member.role === "EDITOR" ? "Người chỉnh sửa" : "Người xem"}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}

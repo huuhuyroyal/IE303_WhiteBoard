@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import {
+import{
   Plus,
   Search,
   LayoutGrid,
@@ -11,6 +11,8 @@ import {
   Trash2,
   X,
   LogOut,
+  Users,
+  UserCircle,
 } from "lucide-react";
 import ShareModal from "../components/ShareModal";
 import NotificationBell from "../components/NotificationBell";
@@ -226,7 +228,7 @@ export default function Dashboard() {
   const [boards, setBoards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState("team");
+  const [activeTab, setActiveTab] = useState("my_boards");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [shareTarget, setShareTarget] = useState(null);
   const [nowMs] = useState(() => Date.now());
@@ -356,14 +358,17 @@ export default function Dashboard() {
           .includes(search.toLowerCase());
         if (!matchesSearch) return false;
 
-        if (activeTab === "recent") {
-          const lastOpened = recentHistory[b.id] || 0;
-          return lastOpened > 0 && nowMs - lastOpened <= ONE_DAY;
+        if (activeTab === "my_boards") {
+          return b.owner?.username === user?.username;
+        }
+
+        if (activeTab === "shared_with_me") {
+          return b.owner?.username !== user?.username;
         }
 
         return true;
       }),
-    [ONE_DAY, activeTab, boards, nowMs, recentHistory, search],
+    [activeTab, boards, search, user?.username],
   );
 
   return (
@@ -381,40 +386,56 @@ export default function Dashboard() {
         </div>
 
         <div className="px-4 py-3 border-b border-slate-100">
-          <div className="flex items-center gap-2.5 p-2 rounded-lg">
-            <div className="w-7 h-7 bg-blue-100 rounded-md flex items-center justify-center">
-              <span className="text-blue-700 text-xs font-bold">
-                {user?.username?.[0]?.toUpperCase() || "U"}
-              </span>
+          <button
+            type="button"
+            onClick={() => navigate("/profile")}
+            className="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-100 transition-colors text-left"
+          >
+            <div className="w-7 h-7 bg-blue-100 rounded-md flex items-center justify-center overflow-hidden">
+              {user?.avatarUrl ? (
+                <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-blue-700 text-xs font-bold">
+                  {user?.username?.[0]?.toUpperCase() || "U"}
+                </span>
+              )}
             </div>
             <span className="text-sm font-medium text-slate-700 flex-1 truncate">
               {user?.username || "Guest"}
             </span>
-          </div>
+          </button>
         </div>
 
         <nav className="flex-1 px-3 py-3 space-y-0.5">
           <button
-            onClick={() => setActiveTab("team")}
+            type="button"
+            onClick={() => navigate("/profile")}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+          >
+            <UserCircle size={16} />
+            Profile
+          </button>
+          <button
+            onClick={() => setActiveTab("my_boards")}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === "team"
+              activeTab === "my_boards"
                 ? "bg-blue-50 text-blue-700"
                 : "text-slate-600 hover:bg-slate-100 hover:text-slate-800"
             }`}
           >
             <LayoutGrid size={16} />
-            All boards
+            My boards
           </button>
           <button
-            onClick={() => setActiveTab("recent")}
+            onClick={() => setActiveTab("shared_with_me")}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === "recent"
+              activeTab === "shared_with_me"
                 ? "bg-blue-50 text-blue-700"
                 : "text-slate-600 hover:bg-slate-100 hover:text-slate-800"
             }`}
           >
-            <Clock size={16} />
-            Recent
+            <Users size={16} />
+            Shared with me
           </button>
         </nav>
 
@@ -460,8 +481,8 @@ export default function Dashboard() {
 
         <main className="flex-1 overflow-auto px-8 py-8">
           <h1 className="text-2xl font-bold text-slate-800 mb-6">
-            {activeTab === "team" && "All boards"}
-            {activeTab === "recent" && "Recent boards"}
+            {activeTab === "my_boards" && "My boards"}
+            {activeTab === "shared_with_me" && "Shared with me"}
           </h1>
 
           {loading ? (
@@ -475,7 +496,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
-              {activeTab === "team" && <NewBoardCard onCreate={handleCreate} />}
+              {activeTab === "my_boards" && <NewBoardCard onCreate={handleCreate} />}
 
               {filtered.map((board) => {
                 const localLastOpened = recentHistory[board.id] || 0;
@@ -507,11 +528,11 @@ export default function Dashboard() {
             </div>
           )}
 
-          {!loading && filtered.length === 0 && !search && activeTab === "recent" && (
+          {!loading && filtered.length === 0 && !search && activeTab === "shared_with_me" && (
             <div className="w-full text-center py-16 text-slate-400">
-              <Clock size={36} className="mx-auto mb-3 opacity-40" />
+              <Users size={36} className="mx-auto mb-3 opacity-40" />
               <p className="text-sm">
-                No recent boards opened
+                No boards shared with you
               </p>
             </div>
           )}

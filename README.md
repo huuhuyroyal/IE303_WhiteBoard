@@ -80,6 +80,17 @@ spring.jpa.show-sql=true
 
 server.port=5000
 
+# File upload limits
+spring.servlet.multipart.max-file-size=15MB
+spring.servlet.multipart.max-request-size=15MB
+
+# AI chatbot
+gemini.api.key=[GCP_API_KEY]
+gemini.api.url=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent
+
+
+## Cloudinary
+cloudinary.url=CLOUDINARY_URL=cloudinary://<your_api_key>:<your_api_secret>@<your_cloud_name>
 ```
 
 **Run development server:**

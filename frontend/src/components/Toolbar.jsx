@@ -5,6 +5,7 @@ import {
   Highlighter, Hand, ArrowRight, Star, Hexagon
 } from 'lucide-react';
 import ColorPicker from './ColorPicker';
+import BoardUploadButton from './BoardUploadButton';
 
 function ToolButton({ icon, active, onClick, title }) {
   return (
@@ -22,7 +23,7 @@ function ToolButton({ icon, active, onClick, title }) {
   );
 }
 
-function SubmenuPanel({ items, activeTool, onSelect, color, setColor, strokeWidth, setStrokeWidth }) {
+function SubmenuPanel({ items, activeTool, onSelect, color, setColor, strokeWidth, setStrokeWidth, onMoreShapes }) {
   return (
     <div className="fixed left-16 top-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl border border-slate-200 p-3 z-50 min-w-[220px]">
       <div className="flex flex-col gap-1 mb-2">
@@ -51,6 +52,18 @@ function SubmenuPanel({ items, activeTool, onSelect, color, setColor, strokeWidt
         strokeWidth={strokeWidth}
         setStrokeWidth={setStrokeWidth}
       />
+
+      {onMoreShapes && (
+        <>
+          <div className="w-full h-px bg-slate-200 my-2"></div>
+          <button
+            onClick={onMoreShapes}
+            className="w-full flex items-center justify-center gap-2 p-2 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+          >
+            <span>More shapes...</span>
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -71,7 +84,20 @@ const SHAPE_ITEMS = [
   { tool: 'hexagon', icon: <Hexagon size={18} />, label: 'Hexagon', title: 'Hexagon (X)' },
 ];
 
-export default function Toolbar({ tool, setTool, color, setColor, strokeWidth, setStrokeWidth }) {
+export default function Toolbar({
+  tool,
+  setTool,
+  color,
+  setColor,
+  strokeWidth,
+  setStrokeWidth,
+  onOpenShapeLibrary,
+  boardId,
+  token,
+  camera,
+  onAddMedia,
+  readOnly = false,
+}) {
   const [openSubmenu, setOpenSubmenu] = useState(null);
 
   const toggleSubmenu = (menu) => {
@@ -149,6 +175,10 @@ export default function Toolbar({ tool, setTool, color, setColor, strokeWidth, s
               setColor={setColor}
               strokeWidth={strokeWidth}
               setStrokeWidth={setStrokeWidth}
+              onMoreShapes={() => {
+                setOpenSubmenu(null);
+                onOpenShapeLibrary?.();
+              }}
             />
           )}
         </div>
@@ -160,6 +190,17 @@ export default function Toolbar({ tool, setTool, color, setColor, strokeWidth, s
           onClick={() => { setTool('note'); setOpenSubmenu(null); }}
           title="Sticky Note (N)"
         />
+        {!readOnly && boardId && onAddMedia && (
+          <>
+            <div className="w-full h-px bg-slate-200 my-1"></div>
+            <BoardUploadButton
+              boardId={boardId}
+              token={token}
+              camera={camera}
+              onAddMedia={onAddMedia}
+            />
+          </>
+        )}
       </div>
     </>
   );

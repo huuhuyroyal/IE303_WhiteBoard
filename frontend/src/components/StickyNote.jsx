@@ -9,7 +9,7 @@ const NOTE_COLORS = [
   { bg: 'bg-purple-100', border: 'border-purple-300', header: 'bg-purple-200' },
 ];
 
-export default function StickyNote({ note, onUpdate, onDelete, cameraZoom = 1 }) {
+export default function StickyNote({ note, onUpdate, onDelete, cameraZoom = 1, readOnly = false }) {
   const [isDragging, setIsDragging] = useState(false);
   const [isEditing, setIsEditing] = useState(note.text === '');
   const dragOffset = useRef({ x: 0, y: 0 });
@@ -23,6 +23,7 @@ export default function StickyNote({ note, onUpdate, onDelete, cameraZoom = 1 })
   }, [isEditing]);
 
   const handleDragStart = (e) => {
+    if (readOnly) return;
     setIsDragging(true);
     dragOffset.current = {
       x: e.clientX / cameraZoom - note.x,
@@ -32,7 +33,7 @@ export default function StickyNote({ note, onUpdate, onDelete, cameraZoom = 1 })
   };
 
   useEffect(() => {
-    if (!isDragging) return undefined;
+    if (!isDragging || readOnly) return undefined;
 
     const handleMove = (e) => {
       onUpdate({
@@ -50,9 +51,10 @@ export default function StickyNote({ note, onUpdate, onDelete, cameraZoom = 1 })
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerup', handleUp);
     };
-  }, [cameraZoom, isDragging, note, onUpdate]);
+  }, [cameraZoom, isDragging, note, onUpdate, readOnly]);
 
   const cycleColor = () => {
+    if (readOnly) return;
     onUpdate({
       ...note,
       colorIndex: ((note.colorIndex || 0) + 1) % NOTE_COLORS.length,
@@ -70,29 +72,33 @@ export default function StickyNote({ note, onUpdate, onDelete, cameraZoom = 1 })
       }}
     >
       <div
-        className={`${colorTheme.header} rounded-t-md px-2 py-1.5 flex items-center justify-between cursor-grab active:cursor-grabbing`}
+        className={`${colorTheme.header} rounded-t-md px-2 py-1.5 flex items-center justify-between ${readOnly ? '' : 'cursor-grab active:cursor-grabbing'}`}
         onPointerDown={handleDragStart}
       >
         <div className="flex items-center gap-1">
           <GripVertical size={14} className="text-slate-400" />
-          <button
-            onClick={cycleColor}
-            title="Change color"
-            className="w-4 h-4 rounded-full border border-slate-400 hover:scale-125 transition-transform"
-            style={{ backgroundColor: ['#fef08a', '#93c5fd', '#86efac', '#f9a8d4', '#c4b5fd'][note.colorIndex || 0] }}
-          />
+          {!readOnly && (
+            <button
+              onClick={cycleColor}
+              title="Change color"
+              className="w-4 h-4 rounded-full border border-slate-400 hover:scale-125 transition-transform"
+              style={{ backgroundColor: ['#fef08a', '#93c5fd', '#86efac', '#f9a8d4', '#c4b5fd'][note.colorIndex || 0] }}
+            />
+          )}
         </div>
-        <button
-          onClick={() => onDelete(note.id)}
-          className="text-slate-400 hover:text-red-500 transition-colors p-0.5 rounded hover:bg-white/50"
-          title="Delete note"
-        >
-          <X size={14} />
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => onDelete(note.id)}
+            className="text-slate-400 hover:text-red-500 transition-colors p-0.5 rounded hover:bg-white/50"
+            title="Delete note"
+          >
+            <X size={14} />
+          </button>
+        )}
       </div>
 
-      <div className="p-2" onDoubleClick={() => setIsEditing(true)}>
-        {isEditing ? (
+      <div className="p-2" onDoubleClick={() => { if (!readOnly) setIsEditing(true); }}>
+        {isEditing && !readOnly ? (
           <textarea
             ref={textareaRef}
             value={note.text}
@@ -102,8 +108,8 @@ export default function StickyNote({ note, onUpdate, onDelete, cameraZoom = 1 })
             placeholder="Type your note here..."
           />
         ) : (
-          <p className="text-sm text-slate-700 whitespace-pre-wrap min-h-[80px] cursor-text">
-            {note.text || 'Double-click to edit...'}
+          <p className={`text-sm text-slate-700 whitespace-pre-wrap min-h-[80px] ${readOnly ? '' : 'cursor-text'}`}>
+            {note.text || (readOnly ? '' : 'Double-click to edit...')}
           </p>
         )}
       </div>

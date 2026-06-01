@@ -23,11 +23,7 @@ public class AISuggestionController {
         this.aiShapeRepository = aiShapeRepository;
     }
 
-    /**
-     * ENDPOINT 1:
-     * Nhận nét vẽ thô từ frontend -> gọi Google InputTools để đoán label
-     * -> lấy danh sách SVG mẫu theo label -> trả options về frontend
-     */
+    // suggest shape by label
     @PostMapping
     public ResponseEntity<?> suggest(
             @PathVariable UUID boardId,
@@ -91,14 +87,11 @@ public class AISuggestionController {
 
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.badRequest().body("Lỗi AI suggest: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Error AI suggest: " + e.getMessage());
         }
     }
 
-    /**
-     * ENDPOINT 2:
-     * Khi user chọn một SVG mẫu -> trả về svgUrl để frontend render
-     */
+    // apply shape
     @PostMapping("/apply")
     public ResponseEntity<?> apply(
             @PathVariable UUID boardId,
@@ -125,7 +118,30 @@ public class AISuggestionController {
 
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.badRequest().body("Lỗi apply: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Error apply shape: " + e.getMessage());
+        }
+    }
+
+    // get shape by label
+    @GetMapping("/label/{label}")
+    public ResponseEntity<?> getShapesByLabel(
+            @PathVariable UUID boardId,
+            @PathVariable String label) {
+        try {
+            List<AIShape> shapes = aiShapeRepository.findByLabel(label);
+            List<Map<String, Object>> options = shapes.stream()
+                    .map(shape -> {
+                        Map<String, Object> item = new HashMap<>();
+                        item.put("sampleId", shape.getSampleId());
+                        item.put("label", shape.getLabel());
+                        item.put("svgUrl", shape.getSvgUrl());
+                        return item;
+                    })
+                    .toList();
+            return ResponseEntity.ok(options);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("Error get shapes by label: " + e.getMessage());
         }
     }
 
@@ -179,7 +195,7 @@ public class AISuggestionController {
                 return (List<String>) firstResult.get(1);
             }
         } catch (Exception e) {
-            System.err.println("Lỗi gọi Google InputTools: " + e.getMessage());
+            System.err.println("Error calling Google InputTools: " + e.getMessage());
         }
 
         return Collections.emptyList();
