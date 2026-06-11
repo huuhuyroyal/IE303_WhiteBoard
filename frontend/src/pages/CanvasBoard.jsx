@@ -25,7 +25,7 @@ export default function CanvasBoard({ boardName }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const token = user?.token || "";
-  const [tool, setTool] = useState("pencil");
+  const [tool, setTool] = useState("select");
   const [color, setColor] = useState("#000000");
   const [strokeWidth, setStrokeWidth] = useState(4);
   const [camera, setCamera] = useState({ x: 0, y: 0, zoom: 1 });
@@ -52,15 +52,20 @@ export default function CanvasBoard({ boardName }) {
   const { clientRef, connected } = socket;
   const scheduleThumbnailSaveRef = useRef(null);
 
-  const { scheduleThumbnailSave, updateTitle, handleExport, submitShare, userRole } =
-    useBoardData({
-      boardId,
-      boardTitle,
-      authHeaders,
-      setBoardTitle,
-      navigate,
-      user,
-    });
+  const {
+    scheduleThumbnailSave,
+    updateTitle,
+    handleExport,
+    submitShare,
+    userRole,
+  } = useBoardData({
+    boardId,
+    boardTitle,
+    authHeaders,
+    setBoardTitle,
+    navigate,
+    user,
+  });
 
   useEffect(() => {
     scheduleThumbnailSaveRef.current = scheduleThumbnailSave;
@@ -101,36 +106,45 @@ export default function CanvasBoard({ boardName }) {
   useEffect(() => attachWheelListener(), [attachWheelListener]);
 
   const handleGroup = useCallback(() => {
-    if (selectedElement && selectedElement.type === 'group' && selectedElement.selectedIds.length > 1) {
+    if (
+      selectedElement &&
+      selectedElement.type === "group" &&
+      selectedElement.selectedIds.length > 1
+    ) {
       const newGroupId = crypto.randomUUID();
-      selectedElement.selectedIds.forEach(uid => {
+      selectedElement.selectedIds.forEach((uid) => {
         const el = drawing.canvasRef.current; // just getting a reference to drawing isn't enough to get element metadata, but updateElement merges
         drawing.updateElement(uid, { metadata: { groupId: newGroupId } });
       });
-      setSelectedElement(prev => ({
-         ...prev,
-         metadata: { ...(prev?.metadata || {}), groupId: newGroupId }
+      setSelectedElement((prev) => ({
+        ...prev,
+        metadata: { ...(prev?.metadata || {}), groupId: newGroupId },
       }));
     }
   }, [selectedElement, drawing]);
 
   const handleUngroup = useCallback(() => {
-    if (selectedElement && selectedElement.type === 'group' && selectedElement.metadata?.groupId) {
-      selectedElement.selectedIds.forEach(uid => {
+    if (
+      selectedElement &&
+      selectedElement.type === "group" &&
+      selectedElement.metadata?.groupId
+    ) {
+      selectedElement.selectedIds.forEach((uid) => {
         drawing.updateElement(uid, { metadata: { groupId: null } });
       });
-      setSelectedElement(prev => ({
-         ...prev,
-         metadata: { ...(prev?.metadata || {}), groupId: null }
+      setSelectedElement((prev) => ({
+        ...prev,
+        metadata: { ...(prev?.metadata || {}), groupId: null },
       }));
     }
   }, [selectedElement, drawing]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")
+        return;
 
-      if (e.ctrlKey && e.key.toLowerCase() === 'g') {
+      if (e.ctrlKey && e.key.toLowerCase() === "g") {
         e.preventDefault();
         if (e.shiftKey) {
           handleUngroup();
@@ -139,25 +153,29 @@ export default function CanvasBoard({ boardName }) {
         }
       }
 
-      if (e.ctrlKey && e.key.toLowerCase() === 'c') {
+      if (e.ctrlKey && e.key.toLowerCase() === "c") {
         if (selectedElement) {
           e.preventDefault();
-          setCopiedElementIds(selectedElement.selectedIds || [selectedElement.id]);
+          setCopiedElementIds(
+            selectedElement.selectedIds || [selectedElement.id],
+          );
         }
       }
 
-      if (e.ctrlKey && e.key.toLowerCase() === 'v') {
+      if (e.ctrlKey && e.key.toLowerCase() === "v") {
         if (copiedElementIds && copiedElementIds.length > 0) {
           e.preventDefault();
           drawing.duplicateElements(copiedElementIds);
         }
       }
 
-      if (e.key === 'Backspace' || e.key === 'Delete') {
+      if (e.key === "Backspace" || e.key === "Delete") {
         if (selectedElement) {
           e.preventDefault();
-          if (selectedElement.type === 'group' || selectedElement.selectedIds) {
-            selectedElement.selectedIds.forEach(uid => drawing.removeElement(uid));
+          if (selectedElement.type === "group" || selectedElement.selectedIds) {
+            selectedElement.selectedIds.forEach((uid) =>
+              drawing.removeElement(uid),
+            );
           } else {
             drawing.removeElement(selectedElement.id);
           }
@@ -165,8 +183,8 @@ export default function CanvasBoard({ boardName }) {
         }
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleGroup, handleUngroup, selectedElement, copiedElementIds, drawing]);
 
   const wrappedPointerDown = (event) => {
@@ -189,15 +207,16 @@ export default function CanvasBoard({ boardName }) {
 
   const wrappedPointerMove = (event) => {
     drawing.handlePointerMove(event, setCamera);
-    
+
     if (connected && clientRef.current) {
       const now = Date.now();
-      if (now - lastPublishRef.current > 50) { // 50ms throttle
+      if (now - lastPublishRef.current > 50) {
+        // 50ms throttle
         const x = (event.clientX - camera.x) / camera.zoom;
         const y = (event.clientY - camera.y) / camera.zoom;
         clientRef.current.publish({
           destination: `/app/board/${boardId}/cursor`,
-          body: JSON.stringify({ username: user?.username, x, y })
+          body: JSON.stringify({ username: user?.username, x, y }),
         });
         lastPublishRef.current = now;
       }
@@ -218,25 +237,27 @@ export default function CanvasBoard({ boardName }) {
     aiSuggestion.clearSuggestion(true);
   };
   useEffect(() => {
-  if (connected && clientRef.current) {
-    // Lắng nghe sự kiện di chuột từ người khác
-    const cursorSub = clientRef.current.subscribe(`/topic/board/${boardId}/cursor`, (message) => {
-      const data = JSON.parse(message.body);
-      
-      // Bỏ qua nếu nhận lại chính con trỏ của mình
-      if (data.username === user?.username) return;
-      // Cập nhật toạ độ của người dùng đó vào state
-      setOtherCursors((prev) => ({
-        ...prev,
-        [data.username]: { x: data.x, y: data.y }
-      }));
-    });
-    return () => {
-      cursorSub.unsubscribe();
-    };
-  }
-}, [connected, boardId, user?.username]);
-  
+    if (connected && clientRef.current) {
+      // Lắng nghe sự kiện di chuột từ người khác
+      const cursorSub = clientRef.current.subscribe(
+        `/topic/board/${boardId}/cursor`,
+        (message) => {
+          const data = JSON.parse(message.body);
+
+          // Bỏ qua nếu nhận lại chính con trỏ của mình
+          if (data.username === user?.username) return;
+          // Cập nhật toạ độ của người dùng đó vào state
+          setOtherCursors((prev) => ({
+            ...prev,
+            [data.username]: { x: data.x, y: data.y },
+          }));
+        },
+      );
+      return () => {
+        cursorSub.unsubscribe();
+      };
+    }
+  }, [connected, boardId, user?.username]);
 
   return (
     <div className="h-screen w-screen bg-slate-50 relative overflow-hidden flex items-center justify-center">
@@ -268,7 +289,6 @@ export default function CanvasBoard({ boardName }) {
           onClose={() => setIsShapeLibraryOpen(false)}
         />
       )}
-
 
       <BoardTopBar
         boardTitle={boardTitle}
@@ -341,71 +361,91 @@ export default function CanvasBoard({ boardName }) {
         />
       )}
 
-      {selectedElement && selectedElement.points && selectedElement.points.length > 0 && tool === 'select' && (
-        <div
-          className="absolute z-20 pointer-events-none"
-          style={{
-            left: `${((Math.min(selectedElement.points[0].x, selectedElement.points[selectedElement.points.length - 1].x) + Math.max(selectedElement.points[0].x, selectedElement.points[selectedElement.points.length - 1].x)) / 2) * camera.zoom + camera.x}px`,
-            top: `${Math.min(selectedElement.points[0].y, selectedElement.points[selectedElement.points.length - 1].y) * camera.zoom + camera.y - 24}px`,
-          }}
-        >
-          <div className="absolute bottom-0 left-1/2 -translate-x-1/2">
-            <div
-              className={`pointer-events-auto transition-all duration-200 ease-out origin-bottom ${
-                isInteracting ? 'opacity-0 scale-95 translate-y-2 pointer-events-none' : 'opacity-100 scale-100 translate-y-0'
-              }`}
-            >
-              <EditPanel
-                boardId={boardId}
-                element={selectedElement}
-                onUpdate={(id, updates) => {
-                  if (id === 'group') {
-                    selectedElement.selectedIds.forEach(uid => drawing.updateElement(uid, updates));
-                    setSelectedElement(prev => ({
-                      ...prev,
-                      ...updates,
-                      metadata: { ...(prev.metadata || {}), ...(updates.metadata || {}) }
-                    }));
-                  } else {
-                    drawing.updateElement(id, updates);
-                  }
-                }}
-                onDuplicate={() => {
-                  drawing.duplicateElements(selectedElement.selectedIds || [selectedElement.id]);
-                }}
-                onDelete={(id) => {
-                  if (id === 'group') {
-                    selectedElement.selectedIds.forEach(uid => drawing.removeElement(uid));
-                  } else {
-                    drawing.removeElement(id);
-                  }
-                  setSelectedElement(null);
-                }}
-                onGroup={handleGroup}
-                onUngroup={handleUngroup}
-              />
+      {selectedElement &&
+        selectedElement.points &&
+        selectedElement.points.length > 0 &&
+        tool === "select" && (
+          <div
+            className="absolute z-20 pointer-events-none"
+            style={{
+              left: `${((Math.min(selectedElement.points[0].x, selectedElement.points[selectedElement.points.length - 1].x) + Math.max(selectedElement.points[0].x, selectedElement.points[selectedElement.points.length - 1].x)) / 2) * camera.zoom + camera.x}px`,
+              top: `${Math.min(selectedElement.points[0].y, selectedElement.points[selectedElement.points.length - 1].y) * camera.zoom + camera.y - 24}px`,
+            }}
+          >
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2">
+              <div
+                className={`pointer-events-auto transition-all duration-200 ease-out origin-bottom ${
+                  isInteracting
+                    ? "opacity-0 scale-95 translate-y-2 pointer-events-none"
+                    : "opacity-100 scale-100 translate-y-0"
+                }`}
+              >
+                <EditPanel
+                  boardId={boardId}
+                  element={selectedElement}
+                  onUpdate={(id, updates) => {
+                    if (id === "group") {
+                      selectedElement.selectedIds.forEach((uid) =>
+                        drawing.updateElement(uid, updates),
+                      );
+                      setSelectedElement((prev) => ({
+                        ...prev,
+                        ...updates,
+                        metadata: {
+                          ...(prev.metadata || {}),
+                          ...(updates.metadata || {}),
+                        },
+                      }));
+                    } else {
+                      drawing.updateElement(id, updates);
+                    }
+                  }}
+                  onDuplicate={() => {
+                    drawing.duplicateElements(
+                      selectedElement.selectedIds || [selectedElement.id],
+                    );
+                  }}
+                  onDelete={(id) => {
+                    if (id === "group") {
+                      selectedElement.selectedIds.forEach((uid) =>
+                        drawing.removeElement(uid),
+                      );
+                    } else {
+                      drawing.removeElement(id);
+                    }
+                    setSelectedElement(null);
+                  }}
+                  onGroup={handleGroup}
+                  onUngroup={handleUngroup}
+                />
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
       <ZoomControls camera={camera} setCamera={setCamera} />
-      <div 
+      <div
         className="absolute inset-0 pointer-events-none z-50"
         style={{
           transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
-          transformOrigin: '0 0'
+          transformOrigin: "0 0",
         }}
       >
         {Object.entries(otherCursors).map(([username, pos]) => (
-          <div 
+          <div
             key={username}
             className="absolute flex items-center gap-1 transition-all duration-100 ease-linear"
             style={{ left: pos.x, top: pos.y }}
           >
             {/* Icon con trỏ chuột */}
             <svg width="18" height="24" viewBox="0 0 18 24" fill="none">
-              <path d="M2.5 2.5L16.5 9.5L9.5 12.5L13.5 21.5L9.5 23.5L5.5 14.5L1.5 17.5V2.5Z" fill="#3B82F6" stroke="white" strokeWidth="2" strokeLinejoin="round"/>
+              <path
+                d="M2.5 2.5L16.5 9.5L9.5 12.5L13.5 21.5L9.5 23.5L5.5 14.5L1.5 17.5V2.5Z"
+                fill="#3B82F6"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinejoin="round"
+              />
             </svg>
             {/* Nhãn tên người dùng */}
             <span className="bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded shadow">
@@ -414,9 +454,8 @@ export default function CanvasBoard({ boardName }) {
           </div>
         ))}
       </div>
-      
+
       <AiChatPanel boardId={boardId} authHeaders={authHeaders} />
     </div>
-    
   );
 }

@@ -152,4 +152,34 @@ public class UserController {
                 "ownedBoards", ownedBoards,
                 "sharedBoards", sharedBoards);
     }
+
+    @Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
+    @PutMapping("/change-password")
+    public ResponseEntity<?> changePassword(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestBody Map<String, String> body) {
+        Optional<User> userOpt = resolveUser(authHeader);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
+
+        User user = userOpt.get();
+        String oldPassword = body.get("oldPassword");
+        String newPassword = body.get("newPassword");
+
+        if (oldPassword == null || newPassword == null || newPassword.length() < 6) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Old password and a 6+ char new password are required"));
+        }
+
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            return ResponseEntity.status(400).body(Map.of("error", "Old password is incorrect"));
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
+    }
 }

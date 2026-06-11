@@ -8,7 +8,8 @@ function getStoredUser() {
   const username = localStorage.getItem('username');
   const userId = localStorage.getItem('userId');
   const avatarUrl = localStorage.getItem('avatarUrl');
-  return token && username ? { token, username, userId, avatarUrl } : null;
+  const displayName = localStorage.getItem('displayName');
+  return token && username ? { token, username, userId, avatarUrl, displayName } : null;
 }
 
 export function AuthProvider({ children }) {
@@ -24,6 +25,11 @@ export function AuthProvider({ children }) {
     } else {
       localStorage.removeItem('avatarUrl');
     }
+    if (data.displayName) {
+      localStorage.setItem('displayName', data.displayName);
+    } else {
+      localStorage.removeItem('displayName');
+    }
     setUser(data);
   };
 
@@ -36,6 +42,9 @@ export function AuthProvider({ children }) {
       if (next.username) {
         localStorage.setItem('username', next.username);
       }
+      if (next.displayName !== undefined) {
+        localStorage.setItem('displayName', next.displayName);
+      }
       return next;
     });
   };
@@ -45,6 +54,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('username');
     localStorage.removeItem('userId');
     localStorage.removeItem('avatarUrl');
+    localStorage.removeItem('displayName');
     setUser(null);
   };
 
