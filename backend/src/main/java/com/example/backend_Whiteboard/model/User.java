@@ -52,4 +52,15 @@ public class User {
     public void setEmail(String email) { this.email = email; }
     public String getAvatarUrl() { return avatarUrl; }
     public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
+
+    @Column(name = "reset_otp", length = 6)
+    private String resetOtp;
+
+    @Column(name = "reset_otp_expiry")
+    private LocalDateTime resetOtpExpiry;
+
+    public String getResetOtp() { return resetOtp; }
+    public void setResetOtp(String resetOtp) { this.resetOtp = resetOtp; }
+    public LocalDateTime getResetOtpExpiry() { return resetOtpExpiry; }
+    public void setResetOtpExpiry(LocalDateTime resetOtpExpiry) { this.resetOtpExpiry = resetOtpExpiry; }
 }

@@ -11,6 +11,8 @@ import {
   Mail,
   User,
   Upload,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 const BASE = "http://localhost:5000";
@@ -27,6 +29,52 @@ export default function Profile() {
 
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
+
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [changePwLoading, setChangePwLoading] = useState(false);
+  const [changePwError, setChangePwError] = useState("");
+  const [changePwMessage, setChangePwMessage] = useState("");
+  const [showPw, setShowPw] = useState(false);
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setChangePwError("");
+    setChangePwMessage("");
+
+    if (newPassword !== confirmNewPassword) {
+      setChangePwError("Mật khẩu xác nhận không khớp.");
+      return;
+    }
+
+    setChangePwLoading(true);
+    try {
+      const res = await fetch(`${BASE}/api/user/change-password`, {
+        method: "PUT",
+        headers: authHeaders(),
+        body: JSON.stringify({ oldPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setChangePwError(data.error || "Không thể đổi mật khẩu");
+        return;
+      }
+      setChangePwMessage("Đổi mật khẩu thành công!");
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+      setTimeout(() => {
+        setIsChangingPassword(false);
+        setChangePwMessage("");
+      }, 3000);
+    } catch {
+      setChangePwError("Không kết nối được máy chủ");
+    } finally {
+      setChangePwLoading(false);
+    }
+  };
 
   const authHeaders = (json = true) => ({
     ...(json ? { "Content-Type": "application/json" } : {}),
@@ -53,6 +101,9 @@ export default function Profile() {
       // Auto-sync global user context if avatarUrl exists and is different
       if (data.avatarUrl && data.avatarUrl !== user?.avatarUrl) {
         updateUser({ avatarUrl: data.avatarUrl });
+      }
+      if (data.displayName && data.displayName !== user?.displayName) {
+        updateUser({ displayName: data.displayName });
       }
     } catch {
       setError("Không kết nối được máy chủ");
@@ -94,6 +145,7 @@ export default function Profile() {
       setEmail(data.email || "");
       setIsEditing(false);
       setMessage("Đã lưu thông tin");
+      updateUser({ displayName: data.displayName });
     } catch {
       setError("Không kết nối được máy chủ");
     } finally {
@@ -282,6 +334,138 @@ export default function Profile() {
                   label="Bảng được chia sẻ"
                 />
               </div>
+            </section>
+
+            <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
+                  Đổi mật khẩu
+                </h2>
+                {!isChangingPassword && (
+                  <button
+                    type="button"
+                    onClick={() => { setIsChangingPassword(true); setChangePwError(""); setChangePwMessage(""); }}
+                    className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100"
+                  >
+                    Đổi mật khẩu
+                  </button>
+                )}
+              </div>
+
+              {isChangingPassword && (
+                <form onSubmit={handleChangePassword} className="space-y-4" autoComplete="off">
+                  {/* Dummy inputs to prevent aggressive browser autofill */}
+                  <div style={{ position: 'absolute', opacity: 0, height: 0, width: 0, overflow: 'hidden' }}>
+                    <input type="text" name="username" autoComplete="username" tabIndex={-1} />
+                    <input type="password" name="password" autoComplete="current-password" tabIndex={-1} />
+                  </div>
+                  
+                  {changePwError && (
+                    <div className="bg-red-50 text-red-700 rounded-lg p-3 text-sm">
+                      {changePwError}
+                    </div>
+                  )}
+                  {changePwMessage && (
+                    <div className="bg-green-50 text-green-700 rounded-lg p-3 text-sm">
+                      {changePwMessage}
+                    </div>
+                  )}
+                  <div className="grid gap-4 sm:grid-cols-1">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
+                        Mật khẩu hiện tại
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPw ? "text" : "password"}
+                          name="oldPassword"
+                          value={oldPassword}
+                          onChange={e => setOldPassword(e.target.value)}
+                          placeholder="Nhập mật khẩu hiện tại"
+                          required
+                          autoComplete="new-password"
+                          className="w-full px-3 py-2 pr-10 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPw(v => !v)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        >
+                          {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
+                          Mật khẩu mới
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showPw ? "text" : "password"}
+                            name="newPassword"
+                            value={newPassword}
+                            onChange={e => setNewPassword(e.target.value)}
+                            placeholder="Nhập mật khẩu mới"
+                            required
+                            autoComplete="new-password"
+                            className="w-full px-3 py-2 pr-10 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPw(v => !v)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          >
+                            {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
+                          Xác nhận mật khẩu mới
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showPw ? "text" : "password"}
+                            name="confirmNewPassword"
+                            value={confirmNewPassword}
+                            onChange={e => setConfirmNewPassword(e.target.value)}
+                            placeholder="Nhập lại mật khẩu mới"
+                            required
+                            autoComplete="new-password"
+                            className="w-full px-3 py-2 pr-10 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPw(v => !v)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          >
+                            {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => { setIsChangingPassword(false); setOldPassword(""); setNewPassword(""); setConfirmNewPassword(""); }}
+                      disabled={changePwLoading}
+                      className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={changePwLoading}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                    >
+                      {changePwLoading && <Loader2 size={14} className="animate-spin" />}
+                      Cập nhật mật khẩu
+                    </button>
+                  </div>
+                </form>
+              )}
             </section>
           </div>
         )}

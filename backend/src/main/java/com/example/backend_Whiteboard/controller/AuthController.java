@@ -191,4 +191,57 @@ public class AuthController {
 
         return ResponseEntity.ok(results);
     }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        if (email == null || email.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Email is required"));
+        }
+
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) {
+            // Return success anyway to prevent email enumeration
+            return ResponseEntity.ok(Map.of("message", "If the email exists, an OTP has been sent."));
+        }
+
+        User user = userOpt.get();
+        String otp = String.format("%06d", new java.util.Random().nextInt(1000000));
+        user.setResetOtp(otp);
+        user.setResetOtpExpiry(java.time.LocalDateTime.now().plusMinutes(5));
+        userRepository.save(user);
+
+        emailService.sendResetPasswordEmail(email, otp);
+
+        return ResponseEntity.ok(Map.of("message", "If the email exists, an OTP has been sent."));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        String otp = body.get("otp");
+        String newPassword = body.get("newPassword");
+
+        if (email == null || otp == null || newPassword == null || newPassword.length() < 6) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Email, OTP, and a 6+ char new password are required"));
+        }
+
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(400).body(Map.of("error", "Invalid or expired OTP"));
+        }
+
+        User user = userOpt.get();
+        if (user.getResetOtp() == null || !user.getResetOtp().equals(otp) || 
+            user.getResetOtpExpiry() == null || java.time.LocalDateTime.now().isAfter(user.getResetOtpExpiry())) {
+            return ResponseEntity.status(400).body(Map.of("error", "Invalid or expired OTP"));
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setResetOtp(null);
+        user.setResetOtpExpiry(null);
+        userRepository.save(user);
+
+        return ResponseEntity.ok(Map.of("message", "Password reset successfully. You can now login with your new password."));
+    }
 }

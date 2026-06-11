@@ -396,12 +396,12 @@ export default function Dashboard() {
                 <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
                 <span className="text-blue-700 text-xs font-bold">
-                  {user?.username?.[0]?.toUpperCase() || "U"}
+                  {(user?.displayName || user?.username)?.[0]?.toUpperCase() || "U"}
                 </span>
               )}
             </div>
             <span className="text-sm font-medium text-slate-700 flex-1 truncate">
-              {user?.username || "Guest"}
+              {user?.displayName || user?.username || "Guest"}
             </span>
           </button>
         </div>
@@ -471,10 +471,14 @@ export default function Dashboard() {
           <div className="ml-auto flex items-center gap-4">
             <NotificationBell />
             <div
-              title={user?.username}
-              className="w-8 h-8 bg-violet-500 rounded-full flex items-center justify-center text-white text-sm font-bold cursor-default"
+              title={user?.displayName || user?.username}
+              className="w-8 h-8 bg-violet-500 rounded-full flex items-center justify-center text-white text-sm font-bold cursor-default overflow-hidden"
             >
-              {user?.username?.[0]?.toUpperCase() || "U"}
+              {user?.avatarUrl ? (
+                <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                (user?.displayName || user?.username)?.[0]?.toUpperCase() || "U"
+              )}
             </div>
           </div>
         </header>

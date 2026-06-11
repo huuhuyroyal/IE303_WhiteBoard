@@ -20,4 +20,14 @@ public class EmailService {
         
         mailSender.send(message);
     }
+
+    public void sendResetPasswordEmail(String toEmail, String otpCode) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom("huydrobui05@gmail.com");
+        message.setTo(toEmail);
+        message.setSubject("Mã OTP Khôi phục mật khẩu Whiteboard");
+        message.setText("Chào bạn,\n\nMã OTP để khôi phục mật khẩu tài khoản của bạn là: " + otpCode + "\n\nMã này sẽ hết hạn trong 5 phút.\n\nTrân trọng,\nĐội ngũ Whiteboard");
+        
+        mailSender.send(message);
+    }
 }
